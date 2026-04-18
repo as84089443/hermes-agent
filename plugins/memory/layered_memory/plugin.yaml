@@ -1,0 +1,7 @@
+name: layered_memory
+version: 0.1.0
+description: "Layer 1 durable working memory for Hermes with local SQLite + FTS5 retrieval and Layer 0 mirroring hooks."
+hooks:
+  - on_memory_write
+  - on_session_end
+  - on_pre_compress

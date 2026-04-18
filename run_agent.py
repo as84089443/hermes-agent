@@ -7073,16 +7073,38 @@ class AIAgent:
             """Worker function executed in a thread."""
             start = time.time()
             try:
+                from tools.environments.base import set_activity_callback
+            except Exception:
+                set_activity_callback = None
+
+            self._current_tool = function_name
+            self._touch_activity(f"executing tool: {function_name}")
+
+            if set_activity_callback is not None:
+                try:
+                    set_activity_callback(self._touch_activity)
+                except Exception:
+                    pass
+
+            try:
                 result = self._invoke_tool(function_name, function_args, effective_task_id, tool_call.id)
             except Exception as tool_error:
                 result = f"Error executing tool '{function_name}': {tool_error}"
                 logger.error("_invoke_tool raised for %s: %s", function_name, tool_error, exc_info=True)
+            finally:
+                if set_activity_callback is not None:
+                    try:
+                        set_activity_callback(None)
+                    except Exception:
+                        pass
             duration = time.time() - start
             is_error, _ = _detect_tool_failure(function_name, result)
             if is_error:
                 logger.info("tool %s failed (%.2fs): %s", function_name, duration, result[:200])
             else:
                 logger.info("tool %s completed (%.2fs, %d chars)", function_name, duration, len(result))
+            self._current_tool = None
+            self._touch_activity(f"tool completed: {function_name} ({duration:.1f}s)")
             results[index] = (function_name, function_args, result, duration, is_error)
 
         # Start spinner for CLI mode (skip when TUI handles tool progress)

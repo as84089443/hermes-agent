@@ -1,0 +1,83 @@
+{
+  "version": "2026-04-14",
+  "project": "brian-ai-workflow",
+  "entities": [
+    {
+      "entity": "customer_sidecar",
+      "primaryKey": "customer_id",
+      "description": "Hermes 對客戶歸屬、PM 歸屬與關係類型的補充知識層。不是共享營運主表。",
+      "required_fields": [
+        "customer_id",
+        "customer_name",
+        "owner_guess",
+        "pm_guess",
+        "relationship_type",
+        "confidence",
+        "notes"
+      ],
+      "fields": {
+        "customer_id": "系統唯一 ID",
+        "customer_name": "正式客戶名稱",
+        "display_name": "常用簡稱",
+        "aliases": "別名陣列",
+        "owner_guess": "客戶歸屬猜測",
+        "pm_guess": "PM 歸屬猜測",
+        "relationship_type": "客戶關係類型",
+        "confidence": "high|medium|low",
+        "source_of_truth": "user_confirmed / vendor_sheet / historical_income / heuristic 等",
+        "do_not_ask_again": "是否不再重問",
+        "known_contacts": "已知聯絡人名單",
+        "known_org_context": "BNI / 上游合作 / 舊同事等脈絡",
+        "lane_defaults": "常見 lane 陣列",
+        "recurring_hint": "是否 recurring / 可複製",
+        "upstream_sources": "常見上游來源",
+        "notes": "操作補充說明"
+      },
+      "enums": {
+        "owner_guess": ["我", "Jerry", "共同", "其他", "待確認"],
+        "pm_guess": ["我", "Jerry", "共同", "其他", "待確認"],
+        "relationship_type": ["我的直接客戶", "共同客戶", "上游合作方", "供應商/外包", "資產租戶", "待確認"],
+        "confidence": ["high", "medium", "low"]
+      }
+    },
+    {
+      "entity": "brand_sidecar",
+      "primaryKey": "brand_id",
+      "description": "品牌 / 子品牌 / 系統線知識層。用來承接麻花影像、B.W.Studio 等無法只靠 customer 表達的運作邏輯。",
+      "required_fields": [
+        "brand_id",
+        "brand_name",
+        "owner_type_guess",
+        "pm_owner_guess",
+        "operating_note",
+        "confidence"
+      ],
+      "fields": {
+        "brand_id": "系統唯一 ID",
+        "brand_name": "品牌名稱",
+        "aliases": "品牌別名",
+        "owner_type_guess": "品牌歸屬猜測",
+        "pm_owner_guess": "品牌 PM 歸屬猜測",
+        "default_lane": "該品牌預設 lane",
+        "operating_controller": "實務上常見主控者（v1.1 候選）",
+        "do_not_ask_again": "是否不再重問",
+        "linked_customers": "關聯客戶陣列",
+        "operating_note": "實際運作說明",
+        "confidence": "high|medium|low",
+        "notes": "補充說明"
+      },
+      "enums": {
+        "owner_type_guess": ["我", "Jerry", "共同", "其他", "待確認"],
+        "pm_owner_guess": ["我", "Jerry", "共同", "其他", "待確認"],
+        "default_lane": ["commercial", "wedding_private", "studio_rental", "post_only", "collab_ops", "待確認"],
+        "confidence": ["high", "medium", "low"]
+      }
+    }
+  ],
+  "update_rules": [
+    "若 Brian 明確確認客戶或品牌歸屬，可提高 confidence。",
+    "若同一規則在多案中穩定成立，可考慮設為 do_not_ask_again。",
+    "共享 Google Sheets 原表不應直接被 sidecar 欄位污染。",
+    "sidecar 是知識層；若規則已穩定，routing 應先查 sidecar，再決定是否補問。"
+  ]
+}

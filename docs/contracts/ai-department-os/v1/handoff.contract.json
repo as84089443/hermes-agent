@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ai-department-os/v1/handoff.contract.json",
+  "title": "AI Department OS v1 Handoff Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "project_id",
+    "from_task_id",
+    "from_role",
+    "to_role",
+    "status",
+    "summary",
+    "artifact_ids",
+    "assumptions",
+    "findings",
+    "open_questions",
+    "risk_notes",
+    "requested_review_type",
+    "next_action",
+    "accepted_by",
+    "accepted_at",
+    "created_at",
+    "is_waiting_acceptance",
+    "has_open_blockers"
+  ],
+  "properties": {
+    "id": { "type": "string", "x-storage": "persisted" },
+    "project_id": { "type": "string", "x-storage": "persisted" },
+    "from_task_id": { "type": "string", "x-storage": "persisted" },
+    "from_role": { "type": "string", "minLength": 1, "x-storage": "persisted" },
+    "to_role": { "type": "string", "minLength": 1, "x-storage": "persisted" },
+    "status": {
+      "type": "string",
+      "enum": ["drafted", "sent", "accepted", "rejected"],
+      "x-storage": "persisted"
+    },
+    "summary": { "type": "string", "minLength": 1, "x-storage": "persisted" },
+    "artifact_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "x-storage": "persisted"
+    },
+    "assumptions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "x-storage": "persisted"
+    },
+    "findings": {
+      "type": "array",
+      "items": { "type": "string" },
+      "x-storage": "persisted"
+    },
+    "open_questions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "x-storage": "persisted"
+    },
+    "risk_notes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "x-storage": "persisted"
+    },
+    "requested_review_type": {
+      "type": ["string", "null"],
+      "enum": ["peer", "gate", "escalation", "human", null],
+      "x-storage": "persisted"
+    },
+    "next_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "action"],
+      "properties": {
+        "owner": { "type": "string", "minLength": 1 },
+        "action": { "type": "string", "minLength": 1 }
+      },
+      "x-storage": "persisted"
+    },
+    "accepted_by": { "type": ["string", "null"], "x-storage": "persisted" },
+    "accepted_at": { "type": ["string", "null"], "format": "date-time", "x-storage": "persisted" },
+    "created_at": { "type": "string", "format": "date-time", "x-storage": "persisted" },
+    "is_waiting_acceptance": { "type": "boolean", "readOnly": true, "x-storage": "derived" },
+    "has_open_blockers": { "type": "boolean", "readOnly": true, "x-storage": "derived" }
+  }
+}

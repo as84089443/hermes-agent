@@ -1046,33 +1046,22 @@ class ProcessRegistry:
                     cwd=entry.get("cwd"),
                     started_at=entry.get("started_at", time.time()),
                     detached=True,  # Can't read output, but can report status + kill
-                    watcher_platform=entry.get("watcher_platform", ""),
-                    watcher_chat_id=entry.get("watcher_chat_id", ""),
-                    watcher_user_id=entry.get("watcher_user_id", ""),
-                    watcher_user_name=entry.get("watcher_user_name", ""),
-                    watcher_thread_id=entry.get("watcher_thread_id", ""),
-                    watcher_interval=entry.get("watcher_interval", 0),
-                    notify_on_complete=entry.get("notify_on_complete", False),
-                    watch_patterns=entry.get("watch_patterns", []),
                 )
                 with self._lock:
                     self._running[session.id] = session
                 recovered += 1
-                logger.info("Recovered detached process: %s (pid=%d)", session.command[:60], pid)
+                logger.info(
+                    "Recovered detached process without notification watchers: %s (pid=%d)",
+                    session.command[:60],
+                    pid,
+                )
 
-                # Re-enqueue watcher so gateway can resume notifications
-                if session.watcher_interval > 0:
-                    self.pending_watchers.append({
-                        "session_id": session.id,
-                        "check_interval": session.watcher_interval,
-                        "session_key": session.session_key,
-                        "platform": session.watcher_platform,
-                        "chat_id": session.watcher_chat_id,
-                        "user_id": session.watcher_user_id,
-                        "user_name": session.watcher_user_name,
-                        "thread_id": session.watcher_thread_id,
-                        "notify_on_complete": session.notify_on_complete,
-                    })
+                # Do NOT restore notify/watch metadata for recovered processes.
+                # Once Hermes restarts, the original output stream/context is gone,
+                # so resuming completion/watch notifications turns old background
+                # jobs into stale noise in the user's chat. Recovered sessions stay
+                # manageable via process(list/poll/kill), but notification behavior
+                # must be opt-in on fresh spawns only.
 
         self._write_checkpoint()
 

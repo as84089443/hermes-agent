@@ -1,0 +1,100 @@
+{
+  "version": "2026-04-14",
+  "project": "brian-ai-workflow",
+  "entity": "review_recap",
+  "primaryKey": "recap_id",
+  "description": "案件完成後的知識抽取格式。不是心得文，而是用來回寫 sidecar、rulebook、do-not-ask-again 的正式 recap schema。",
+  "required_fields": [
+    "recap_id",
+    "case_id",
+    "case_title",
+    "primary_lane",
+    "customer_name",
+    "client_owner_final",
+    "pm_owner_final",
+    "brian_exec_final",
+    "brian_role_final",
+    "income_nature_final",
+    "customer_sidecar_update_needed",
+    "brand_sidecar_update_needed",
+    "rulebook_update_needed",
+    "do_not_ask_again_candidate"
+  ],
+  "field_groups": {
+    "identity": [
+      "recap_id",
+      "case_id",
+      "created_at",
+      "created_by",
+      "version"
+    ],
+    "case_facts": [
+      "case_title",
+      "primary_lane",
+      "brand_or_system",
+      "customer_name",
+      "client_owner_final",
+      "pm_owner_final",
+      "executor_summary",
+      "brian_exec_final",
+      "brian_role_final"
+    ],
+    "business_result": [
+      "quote_version_final",
+      "artifact_version_final",
+      "delivered_at",
+      "collected_at",
+      "brian_net",
+      "jerry_net",
+      "chu_post",
+      "income_nature_final"
+    ],
+    "exceptions": [
+      "change_review_triggered",
+      "change_review_summary",
+      "special_notes",
+      "incident_flags"
+    ],
+    "learning": [
+      "customer_sidecar_update_needed",
+      "brand_sidecar_update_needed",
+      "rulebook_update_needed",
+      "do_not_ask_again_candidate",
+      "template_candidate",
+      "template_candidate_reason",
+      "recurring_pattern_candidate"
+    ],
+    "pending": [
+      "pending_fields",
+      "pending_reason"
+    ]
+  },
+  "enums": {
+    "client_owner_final": ["我", "Jerry", "共同", "其他", "待確認"],
+    "pm_owner_final": ["我", "Jerry", "共同", "其他", "待確認"],
+    "brian_exec_final": ["是", "否", "待確認"],
+    "brian_role_final": ["主輸出", "支援", "僅管理", "未參與", "待確認"],
+    "income_nature_final": ["核心執行", "PM/接案", "兼具PM與執行", "共同客戶/共同PM", "協作支援", "資產收入", "待確認"],
+    "customer_sidecar_update_needed": [true, false],
+    "brand_sidecar_update_needed": [true, false],
+    "rulebook_update_needed": [true, false],
+    "do_not_ask_again_candidate": [true, false],
+    "template_candidate": [true, false],
+    "change_review_triggered": [true, false]
+  },
+  "human_confirmation_required": [
+    "client_owner_final",
+    "pm_owner_final",
+    "brian_exec_final",
+    "brian_role_final",
+    "income_nature_final",
+    "do_not_ask_again_candidate"
+  ],
+  "writeback_rules": [
+    "若 customer_sidecar_update_needed=true，必須決定是否更新 customer sidecar。",
+    "若 brand_sidecar_update_needed=true，必須決定是否更新 brand sidecar。",
+    "若 rulebook_update_needed=true，必須決定是否更新 analysis rulebook。",
+    "若 do_not_ask_again_candidate=true，必須確認是否加入 do-not-ask-again 清單。",
+    "若 pending_fields 非空，案件仍可 close，但必須保留 pending_reason。"
+  ]
+}

@@ -1039,6 +1039,97 @@ class TestReactions:
         assert remove_calls[0].kwargs["name"] == "eyes"
 
 
+class TestBotIdHumanAuthoredMessages:
+    """Slack App Home / user-token-authored messages can carry bot_id but should still process."""
+
+    @pytest.mark.asyncio
+    async def test_bot_id_with_human_user_in_dm_is_processed(self, adapter):
+        adapter._team_bot_user_ids = {"T_TEAM": "U_BOT"}
+        adapter._bot_user_id = "U_BOT"
+        adapter._app.client.users_info = AsyncMock(return_value={"user": {"profile": {"display_name": "Brian"}}})
+        adapter._app.client.reactions_add = AsyncMock()
+        adapter._app.client.reactions_remove = AsyncMock()
+
+        event = {
+            "text": "DM inbound from App Home",
+            "user": "U_USER",
+            "bot_id": "B_OTHER",
+            "channel": "D123",
+            "channel_type": "im",
+            "ts": "111.222",
+            "team": "T_TEAM",
+        }
+
+        await adapter._handle_slack_message(event)
+        adapter.handle_message.assert_called_once()
+        msg_event = adapter.handle_message.call_args[0][0]
+        assert msg_event.text == "DM inbound from App Home"
+        assert msg_event.source.user_id == "U_USER"
+
+    @pytest.mark.asyncio
+    async def test_bot_id_without_user_but_assistant_metadata_is_processed(self, adapter):
+        adapter._team_bot_user_ids = {"T_TEAM": "U_BOT"}
+        adapter._bot_user_id = "U_BOT"
+        adapter._assistant_threads[("D123", "171.000")] = {
+            "channel_id": "D123",
+            "thread_ts": "171.000",
+            "user_id": "U_USER",
+            "team_id": "T_TEAM",
+        }
+        adapter._app.client.users_info = AsyncMock(return_value={"user": {"profile": {"display_name": "Brian"}}})
+        adapter._app.client.reactions_add = AsyncMock()
+        adapter._app.client.reactions_remove = AsyncMock()
+
+        event = {
+            "text": "DM inbound from assistant thread",
+            "bot_id": "B_OTHER",
+            "channel": "D123",
+            "channel_type": "im",
+            "thread_ts": "171.000",
+            "ts": "171.111",
+            "team": "T_TEAM",
+        }
+
+        await adapter._handle_slack_message(event)
+        adapter.handle_message.assert_called_once()
+        msg_event = adapter.handle_message.call_args[0][0]
+        assert msg_event.text == "DM inbound from assistant thread"
+        assert msg_event.source.user_id == "U_USER"
+
+    @pytest.mark.asyncio
+    async def test_true_bot_message_without_user_still_ignored(self, adapter):
+        adapter._team_bot_user_ids = {"T_TEAM": "U_BOT"}
+        event = {
+            "text": "bot message",
+            "bot_id": "B_OTHER",
+            "subtype": "bot_message",
+            "channel": "D123",
+            "channel_type": "im",
+            "ts": "111.333",
+            "team": "T_TEAM",
+        }
+
+        await adapter._handle_slack_message(event)
+        adapter.handle_message.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_false_like_allow_bots_values_still_ignore_true_bot_messages(self, adapter, monkeypatch):
+        adapter._team_bot_user_ids = {"T_TEAM": "U_BOT"}
+        monkeypatch.setenv("SLACK_ALLOW_BOTS", "false")
+        event = {
+            "text": "bot message",
+            "bot_id": "B_OTHER",
+            "subtype": "bot_message",
+            "channel": "D123",
+            "channel_type": "im",
+            "ts": "111.444",
+            "team": "T_TEAM",
+        }
+
+        await adapter._handle_slack_message(event)
+        adapter.handle_message.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # TestThreadReplyHandling
 # ---------------------------------------------------------------------------
@@ -1451,6 +1542,16 @@ class TestMessageSplitting:
         )
         await adapter.send("C123", "hello world")
         assert adapter._app.client.chat_postMessage.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_send_strips_self_mentions_from_outgoing_text(self, adapter):
+        adapter._app.client.chat_postMessage = AsyncMock(return_value={"ts": "ts1"})
+        adapter._bot_user_id = "U_BOT"
+        adapter._team_bot_user_ids = {"T1": "U_BOT"}
+        await adapter.send("C123", "交辦摘要：<@U_BOT>")
+        kwargs = adapter._app.client.chat_postMessage.call_args.kwargs
+        assert "<@U_BOT>" not in kwargs["text"]
+        assert "交辦摘要：" in kwargs["text"]
 
     @pytest.mark.asyncio
     async def test_send_preserves_blockquote_formatting(self, adapter):

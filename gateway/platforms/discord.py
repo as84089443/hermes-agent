@@ -1662,11 +1662,11 @@ class DiscordAdapter(BasePlatformAdapter):
         async def slash_usage(interaction: discord.Interaction):
             await self._run_simple_slash(interaction, "/usage")
 
-        @tree.command(name="provider", description="Show available providers")
+        @tree.command(name="provider", description="顯示可用 providers")
         async def slash_provider(interaction: discord.Interaction):
             await self._run_simple_slash(interaction, "/provider")
 
-        @tree.command(name="help", description="Show available commands")
+        @tree.command(name="help", description="顯示可用指令")
         async def slash_help(interaction: discord.Interaction):
             await self._run_simple_slash(interaction, "/help")
 
@@ -2223,11 +2223,11 @@ class DiscordAdapter(BasePlatformAdapter):
                 provider_label = current_provider
 
             embed = discord.Embed(
-                title="⚙ Model Configuration",
+                title="⚙ 模型設定",
                 description=(
-                    f"Current model: `{current_model or 'unknown'}`\n"
-                    f"Provider: {provider_label}\n\n"
-                    f"Select a provider:"
+                    f"目前模型：`{current_model or 'unknown'}`\n"
+                    f"Provider：{provider_label}\n\n"
+                    f"請選擇 provider："
                 ),
                 color=discord.Color.blue(),
             )
@@ -2960,8 +2960,8 @@ if DISCORD_AVAILABLE:
 
             await interaction.response.edit_message(
                 embed=discord.Embed(
-                    title="⚙ Model Configuration",
-                    description=f"Provider: **{pname}**\nSelect a model:{extra}",
+                    title="⚙ 模型設定",
+                    description=f"Provider：**{pname}**\n請選擇模型：{extra}",
                     color=discord.Color.blue(),
                 ),
                 view=self,
@@ -3018,11 +3018,11 @@ if DISCORD_AVAILABLE:
 
             await interaction.response.edit_message(
                 embed=discord.Embed(
-                    title="⚙ Model Configuration",
+                    title="⚙ 模型設定",
                     description=(
-                        f"Current model: `{self.current_model or 'unknown'}`\n"
-                        f"Provider: {provider_label}\n\n"
-                        f"Select a provider:"
+                        f"目前模型：`{self.current_model or 'unknown'}`\n"
+                        f"Provider：{provider_label}\n\n"
+                        f"請選擇 provider："
                     ),
                     color=discord.Color.blue(),
                 ),
@@ -3034,8 +3034,8 @@ if DISCORD_AVAILABLE:
             self.clear_items()
             await interaction.response.edit_message(
                 embed=discord.Embed(
-                    title="⚙ Model Configuration",
-                    description="Model selection cancelled.",
+                    title="⚙ 模型設定",
+                    description="已取消模型選擇。",
                     color=discord.Color.greyple(),
                 ),
                 view=self,

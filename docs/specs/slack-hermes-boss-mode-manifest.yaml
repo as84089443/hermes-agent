@@ -1,0 +1,51 @@
+display_information:
+  name: Hermes
+  description: 老闆模式 AI 助理與決策入口
+  background_color: "#0F172A"
+
+features:
+  bot_user:
+    display_name: Hermes
+    always_online: true
+  slash_commands:
+    - command: /hermes
+      description: 老闆模式指揮、決策與專案入口
+      usage_hint: "[問題、指令、/approvals、/status、/changes ...]"
+      should_escape: false
+
+oauth_config:
+  scopes:
+    bot:
+      - app_mentions:read
+      - assistant:write
+      - channels:history
+      - channels:read
+      - chat:write
+      - chat:write.public
+      - commands
+      - files:read
+      - files:write
+      - groups:history
+      - groups:read
+      - im:history
+      - im:read
+      - mpim:history
+      - mpim:read
+      - reactions:write
+      - users:read
+
+settings:
+  interactivity:
+    is_enabled: true
+  org_deploy_enabled: false
+  socket_mode_enabled: true
+  token_rotation_enabled: false
+  event_subscriptions:
+    bot_events:
+      - app_mention
+      - assistant_thread_started
+      - assistant_thread_context_changed
+      - message.channels
+      - message.groups
+      - message.im
+      - message.mpim

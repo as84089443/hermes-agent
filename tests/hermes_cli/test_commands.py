@@ -185,6 +185,11 @@ class TestGatewayHelpLines:
         lines = gateway_help_lines()
         assert len(lines) > 10
 
+    def test_uses_traditional_chinese_descriptions(self):
+        lines = gateway_help_lines()
+        help_line = next(line for line in lines if line.startswith("`/help`"))
+        assert "顯示可用指令" in help_line
+
     def test_excludes_cli_only_commands_without_config_gate(self):
         lines = gateway_help_lines()
         joined = "\n".join(lines)
@@ -207,6 +212,10 @@ class TestTelegramBotCommands:
         for name, desc in cmds:
             assert isinstance(name, str)
             assert isinstance(desc, str)
+
+    def test_uses_traditional_chinese_descriptions(self):
+        cmds = dict(telegram_bot_commands())
+        assert cmds["help"] == "顯示可用指令"
 
     def test_no_hyphens_in_command_names(self):
         """Telegram does not support hyphens in command names."""

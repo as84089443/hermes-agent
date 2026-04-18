@@ -272,19 +272,21 @@ def build_session_context_prompt(
         lines.append("")
         lines.append(
             "**Slack response style:** Default to Traditional Chinese and use boss-mode formatting. "
-            "Lead with a short conclusion, then current status, then the next decision/action. "
-            "Prefer short bullet sections over long prose. Hide raw IDs, enum names, and internal engineering jargon unless they are necessary for execution."
+            "Be extremely concise. Prefer 2–4 short lines total, not long prose. "
+            "Lead with a short conclusion, then current status, then the next decision/action only if needed. "
+            "Hide raw IDs, enum names, and internal engineering jargon unless they are necessary for execution."
         )
         lines.append(
             "**Slack thread-first rule:** In channels, treat each thread as one work lane / one shared session. "
-            "Keep detailed execution, debugging, and iterative back-and-forth inside the thread. "
+            "Keep detailed execution, debugging, and iterative back-and-forth inside the thread only when it adds real decision value. "
+            "Do not narrate every step. Do not send multiple rapid-fire progress updates unless the state materially changed. "
             "Only send short boss-mode summaries back to the parent channel when there is a new lane kickoff, a blocker that needs attention, an approval/decision request, or a closeout/result worth surfacing."
         )
         lines.append(
-            "**Slack kickoff formatting:** For a new top-level channel request, keep the first visible reply short and thread-oriented: 「結論 / 現況 / 下一步」, then continue the real work in-thread."
+            "**Slack kickoff formatting:** For a new top-level channel request, keep the first visible reply very short and thread-oriented: 「結論 / 現況 / 下一步」. One compact kickoff is enough, then continue only when there is meaningful progress."
         )
         lines.append(
-            "**Slack decision formatting:** For approvals, blockers, or project updates, prefer this shape: 「結論 / 現況 / 你現在要決定什麼 / 批准後會發生什麼 / 若不同意會退回哪裡 / 下一步」."
+            "**Slack decision formatting:** For approvals, blockers, or project updates, prefer this shape: 「結論 / 現況 / 你現在要決定什麼 / 批准後會發生什麼 / 若不同意會退回哪裡 / 下一步」. If no decision is needed, skip the extra headings and stay brief."
         )
     elif context.source.platform == Platform.DISCORD:
         lines.append("")

@@ -1354,6 +1354,25 @@ class TestConcurrentToolExecution:
         assert "beta" in messages[1]["content"]
         assert "gamma" in messages[2]["content"]
 
+    def test_concurrent_sets_activity_callback_for_worker_tools(self, agent):
+        """Concurrent worker threads should register environment activity heartbeats."""
+        tc1 = _mock_tool_call(name="web_search", arguments='{"q":"alpha"}', call_id="c1")
+        tc2 = _mock_tool_call(name="web_search", arguments='{"q":"beta"}', call_id="c2")
+        mock_msg = _mock_assistant_msg(content="", tool_calls=[tc1, tc2])
+        messages = []
+
+        with patch("run_agent.handle_function_call", side_effect=["alpha", "beta"]), \
+             patch("tools.environments.base.set_activity_callback") as mock_set_cb, \
+             patch.object(agent, "_touch_activity") as mock_touch:
+            agent._execute_tool_calls_concurrent(mock_msg, messages, "task-1")
+
+        assert mock_set_cb.call_count == 4
+        callbacks = [call.args[0] for call in mock_set_cb.call_args_list]
+        assert sum(cb is None for cb in callbacks) == 2
+        assert sum(cb is not None for cb in callbacks) == 2
+        mock_touch.assert_any_call("executing tool: web_search")
+        assert any(str(call.args[0]).startswith("tool completed: web_search") for call in mock_touch.call_args_list)
+
     def test_concurrent_preserves_order_despite_timing(self, agent):
         """Even if tools finish in different order, messages should be in original order."""
         import time as _time

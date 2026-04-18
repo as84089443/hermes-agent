@@ -381,6 +381,7 @@ class TestPluginMemoryDiscovery:
         providers = discover_memory_providers()
         names = [name for name, _, _ in providers]
         assert "holographic" in names  # always available (no external deps)
+        assert "layered_memory" in names
 
     def test_load_provider_by_name(self):
         """load_memory_provider returns a working provider instance."""
@@ -390,10 +391,44 @@ class TestPluginMemoryDiscovery:
         assert p.name == "holographic"
         assert p.is_available()
 
+        layered = load_memory_provider("layered_memory")
+        assert layered is not None
+        assert layered.name == "layered_memory"
+        assert layered.is_available()
+
     def test_load_nonexistent_returns_none(self):
         """load_memory_provider returns None for unknown names."""
         from plugins.memory import load_memory_provider
         assert load_memory_provider("nonexistent_provider") is None
+
+    def test_layered_memory_tools_route_through_manager(self, tmp_path):
+        from plugins.memory import load_memory_provider
+
+        mgr = MemoryManager()
+        provider = load_memory_provider("layered_memory")
+        assert provider is not None
+        mgr.add_provider(provider)
+        mgr.initialize_all(
+            session_id="session-1",
+            hermes_home=str(tmp_path),
+            platform="cli",
+            agent_identity="coder",
+        )
+        mgr.sync_all(
+            "之後都走 as84089443 fork 主路，不要再回報舊 upstream PR",
+            "收到，我之後會只沿著 fork 主路推進",
+            session_id="session-1",
+        )
+
+        tool_names = {schema["name"] for schema in mgr.get_all_tool_schemas()}
+        assert "layered_memory_list_candidates" in tool_names
+        assert "layered_memory_search" in tool_names
+        assert "layered_memory_status" in tool_names
+
+        status = json.loads(mgr.handle_tool_call("layered_memory_status", {}))
+        assert status["success"] is True
+        assert status["scope"] == {"type": "profile", "id": "coder"}
+        assert status["counts"]["layer0_candidates"] >= 1
 
 
 # ---------------------------------------------------------------------------

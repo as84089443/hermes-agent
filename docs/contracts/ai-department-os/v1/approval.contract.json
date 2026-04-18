@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ai-department-os/v1/approval.contract.json",
+  "title": "AI Department OS v1 Approval Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "project_id",
+    "gate",
+    "status",
+    "requested_by",
+    "requested_at",
+    "reviewed_by",
+    "reviewed_at",
+    "artifact_refs",
+    "decision_notes",
+    "waiting_on_human",
+    "blocks_project"
+  ],
+  "properties": {
+    "id": { "type": "string", "x-storage": "persisted" },
+    "project_id": { "type": "string", "x-storage": "persisted" },
+    "gate": {
+      "type": "string",
+      "enum": ["script_selection", "final_qa", "human_approval", "publish_closeout", "change_review"],
+      "x-storage": "persisted"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "approved", "changes_requested", "rejected"],
+      "x-storage": "persisted"
+    },
+    "requested_by": { "type": "string", "minLength": 1, "x-storage": "persisted" },
+    "requested_at": { "type": "string", "format": "date-time", "x-storage": "persisted" },
+    "reviewed_by": { "type": ["string", "null"], "x-storage": "persisted" },
+    "reviewed_at": { "type": ["string", "null"], "format": "date-time", "x-storage": "persisted" },
+    "artifact_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["artifact_id", "version"],
+        "properties": {
+          "artifact_id": { "type": "string" },
+          "version": { "type": "integer", "minimum": 1 }
+        }
+      },
+      "x-storage": "persisted"
+    },
+    "decision_notes": { "type": ["string", "null"], "x-storage": "persisted" },
+    "waiting_on_human": { "type": "boolean", "readOnly": true, "x-storage": "derived" },
+    "blocks_project": { "type": "boolean", "readOnly": true, "x-storage": "derived" }
+  }
+}

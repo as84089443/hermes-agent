@@ -1,0 +1,24 @@
+agent_role: script
+project_id: VID-YYYYMMDD-001
+from_task_id: TASK-001
+handoff_status: sent
+status: done
+summary: "完成 script v1 與 2 個變體"
+artifact_ids:
+  - script:v1
+  - prompt-pack:v1
+assumptions:
+  - "目前以問題導向 hook 為主"
+findings:
+  - "最有效 hook 偏問題導向"
+open_questions:
+  - "是否需要更強銷售 CTA"
+risks:
+  - severity: medium
+    item: "案例敘述需再次核對實績數字"
+requested_review_type: peer
+next_action:
+  owner: storyboard
+  action: "convert script into storyboard and shot list"
+accepted_by:
+accepted_at:

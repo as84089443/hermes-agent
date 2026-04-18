@@ -118,6 +118,43 @@ class TestAuthenticate:
 
 class TestSessionOps:
     @pytest.mark.asyncio
+    async def test_acp_help_output_is_traditional_chinese(self, agent):
+        resp = await agent.new_session(cwd="/tmp")
+        state = agent.session_manager.get_session(resp.session_id)
+
+        text = agent._cmd_help("", state)
+
+        assert "可用指令：" in text
+        assert "/help" in text
+        assert "顯示可用指令" in text
+        assert "無法識別的 /commands 會當成一般訊息送給模型處理。" in text
+
+    @pytest.mark.asyncio
+    async def test_acp_model_status_output_is_traditional_chinese(self, agent):
+        resp = await agent.new_session(cwd="/tmp")
+        state = agent.session_manager.get_session(resp.session_id)
+
+        text = agent._cmd_model("", state)
+
+        assert "目前模型：" in text
+        assert "Provider：" in text
+
+    @pytest.mark.asyncio
+    async def test_acp_tools_output_is_traditional_chinese(self, agent, monkeypatch):
+        resp = await agent.new_session(cwd="/tmp")
+        state = agent.session_manager.get_session(resp.session_id)
+
+        monkeypatch.setattr(
+            "model_tools.get_tool_definitions",
+            lambda **kwargs: [{"function": {"name": "demo_tool", "description": "Demo description"}}],
+        )
+
+        text = agent._cmd_tools("", state)
+
+        assert "可用工具（共 1 個）：" in text
+        assert "demo_tool: Demo description" in text
+
+    @pytest.mark.asyncio
     async def test_new_session_creates_session(self, agent):
         resp = await agent.new_session(cwd="/home/user/project")
         assert isinstance(resp, NewSessionResponse)
@@ -135,7 +172,7 @@ class TestSessionOps:
         )
 
         assert help_cmd is not None
-        assert help_cmd.description == "List available commands"
+        assert help_cmd.description == "列出可用指令"
         assert help_cmd.input is None
 
     @pytest.mark.asyncio
@@ -165,7 +202,7 @@ class TestSessionOps:
             cmd for cmd in update.available_commands if cmd.name == "model"
         )
         assert model_cmd.input is not None
-        assert model_cmd.input.root.hint == "model name to switch to"
+        assert model_cmd.input.root.hint == "要切換的模型名稱"
 
     @pytest.mark.asyncio
     async def test_new_session_schedules_available_commands_update(self, agent):
@@ -522,7 +559,7 @@ class TestSlashCommands:
         state = self._make_state(mock_manager)
         state.history = []
         result = agent._handle_slash_command("/context", state)
-        assert "empty" in result.lower()
+        assert "目前對話是空的" in result
 
     def test_context_with_messages(self, agent, mock_manager):
         state = self._make_state(mock_manager)
@@ -531,14 +568,14 @@ class TestSlashCommands:
             {"role": "assistant", "content": "hi"},
         ]
         result = agent._handle_slash_command("/context", state)
-        assert "2 messages" in result
-        assert "user: 1" in result
+        assert "對話：共 2 則訊息" in result
+        assert "user：1" in result
 
     def test_reset_clears_history(self, agent, mock_manager):
         state = self._make_state(mock_manager)
         state.history = [{"role": "user", "content": "hello"}]
         result = agent._handle_slash_command("/reset", state)
-        assert "cleared" in result.lower()
+        assert "已清除對話歷史" in result
         assert len(state.history) == 0
 
     def test_version(self, agent, mock_manager):
@@ -672,7 +709,7 @@ class TestSlashCommands:
             state = manager.create_session(cwd="/tmp")
             result = acp_agent._cmd_model("anthropic:claude-sonnet-4-6", state)
 
-        assert "Provider: anthropic" in result
+        assert "Provider：anthropic" in result
         assert state.agent.provider == "anthropic"
         assert state.agent.base_url == "https://anthropic.example/v1"
         assert runtime_calls[-1] == "anthropic"

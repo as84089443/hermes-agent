@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ai-department-os/v1/event.contract.json",
+  "title": "AI Department OS v1 Event Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "project_id",
+    "entity_type",
+    "entity_id",
+    "event_type",
+    "actor",
+    "payload_json",
+    "created_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "x-storage": "persisted" },
+    "project_id": { "type": "string", "x-storage": "persisted" },
+    "entity_type": {
+      "type": "string",
+      "enum": ["project", "task", "handoff", "approval", "artifact"],
+      "x-storage": "persisted"
+    },
+    "entity_id": { "type": "string", "x-storage": "persisted" },
+    "event_type": {
+      "type": "string",
+      "enum": ["project_state_changed", "task_created", "task_state_changed", "handoff_sent", "handoff_accepted", "approval_requested", "approval_decided", "artifact_written", "branch_merged", "escalation_raised"],
+      "x-storage": "persisted"
+    },
+    "actor": { "type": "string", "minLength": 1, "x-storage": "persisted" },
+    "payload_json": { "type": "object", "x-storage": "persisted" },
+    "created_at": { "type": "string", "format": "date-time", "x-storage": "persisted" }
+  }
+}

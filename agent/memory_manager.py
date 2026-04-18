@@ -1,18 +1,17 @@
-"""MemoryManager — orchestrates the built-in memory provider plus at most
+"""MemoryManager — orchestrates built-in memory handling plus at most
 ONE external plugin memory provider.
 
 Single integration point in run_agent.py. Replaces scattered per-backend
 code with one manager that delegates to registered providers.
 
-The BuiltinMemoryProvider is always registered first and cannot be removed.
+Built-in memory handling is always present.
 Only ONE external (non-builtin) provider is allowed at a time — attempting
-to register a second external provider is rejected with a warning.  This
+to register a second external provider is rejected with a warning. This
 prevents tool schema bloat and conflicting memory backends.
 
 Usage in run_agent.py:
     self._memory_manager = MemoryManager()
-    self._memory_manager.add_provider(BuiltinMemoryProvider(...))
-    # Only ONE of these:
+    # Optionally add one external provider plugin:
     self._memory_manager.add_provider(plugin_provider)
 
     # System prompt
@@ -69,10 +68,10 @@ def build_memory_context_block(raw_context: str) -> str:
 
 
 class MemoryManager:
-    """Orchestrates the built-in provider plus at most one external provider.
+    """Orchestrates built-in memory handling plus at most one external provider.
 
-    The builtin provider is always first. Only one non-builtin (external)
-    provider is allowed.  Failures in one provider never block the other.
+    Only one non-builtin (external) provider is allowed. Failures in one
+    provider never block the other.
     """
 
     def __init__(self) -> None:
@@ -303,7 +302,8 @@ class MemoryManager:
     def on_memory_write(self, action: str, target: str, content: str) -> None:
         """Notify external providers when the built-in memory tool writes.
 
-        Skips the builtin provider itself (it's the source of the write).
+        Skips providers named ``builtin`` because built-in memory is the source
+        of the write event.
         """
         for provider in self._providers:
             if provider.name == "builtin":

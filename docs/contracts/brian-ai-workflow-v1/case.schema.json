@@ -1,0 +1,90 @@
+{
+  "version": "2026-04-14",
+  "project": "brian-ai-workflow",
+  "entity": "case",
+  "primaryKey": "case_id",
+  "description": "Brian AI workflow 的正式案件主體。所有 intake、routing、approval、execution、delivery、billing、review 都圍繞 case 運作。",
+  "required_fields": [
+    "case_id",
+    "title",
+    "source",
+    "customer_name",
+    "primary_lane",
+    "status",
+    "current_owner",
+    "next_action",
+    "next_owner",
+    "created_at",
+    "updated_at"
+  ],
+  "field_groups": {
+    "identity": [
+      "case_id",
+      "title",
+      "source",
+      "customer_name",
+      "brand_or_system"
+    ],
+    "ownership": [
+      "client_owner",
+      "pm_owner",
+      "brian_exec",
+      "brian_role",
+      "executor",
+      "approver",
+      "current_owner",
+      "next_owner"
+    ],
+    "workflow": [
+      "primary_lane",
+      "status",
+      "next_action",
+      "budget_status",
+      "due_date"
+    ],
+    "versioning": [
+      "quote_version",
+      "artifact_version",
+      "scope_locked_at",
+      "approved_at",
+      "accepted_at"
+    ],
+    "content": [
+      "raw_brief",
+      "normalized_brief",
+      "deliverables",
+      "notes",
+      "risk_flags"
+    ],
+    "relations": [
+      "parent_case_id",
+      "project_group_id",
+      "sidecar_type"
+    ],
+    "audit": [
+      "created_at",
+      "updated_at",
+      "closed_at",
+      "lost_reason"
+    ]
+  },
+  "enums": {
+    "client_owner": ["我", "Jerry", "共同", "其他", "待確認"],
+    "pm_owner": ["我", "Jerry", "共同", "其他", "待確認"],
+    "brian_exec": ["是", "否", "待確認"],
+    "brian_role": ["主輸出", "支援", "僅管理", "未參與", "待確認"],
+    "primary_lane": ["commercial", "wedding_private", "studio_rental", "post_only", "collab_ops"],
+    "status": ["intake", "clarifying", "ready_for_quote", "quote_sent", "soft_hold", "confirmed", "in_execution", "delivered", "billing", "collected", "closed", "lost"],
+    "budget_status": ["unknown", "needs_quote", "quoted", "approved", "internal"],
+    "sidecar_type": ["none", "client_sidecar", "brand_sidecar", "internal_sidecar"]
+  },
+  "derived_rules": [
+    "confirmed 後必須有 confirmed_at，並啟動 scope_locked_at。",
+    "若 status=quote_sent，必須有 quote_version。",
+    "若 status=delivered，應至少有 artifact_version 或 deliverables 摘要。",
+    "若 status=closed，應先有 review recap。",
+    "若 client_owner=我 且 pm_owner=我 且 brian_exec=是 且 brian_role=主輸出，則收入性質偏兼具PM與執行。",
+    "若 client_owner=我 且 pm_owner=我 且 brian_exec=否，則收入性質偏 PM/接案。",
+    "若 primary_lane=studio_rental，收入性質應視為資產收入。"
+  ]
+}

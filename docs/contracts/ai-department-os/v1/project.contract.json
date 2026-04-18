@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ai-department-os/v1/project.contract.json",
+  "title": "AI Department OS v1 Project Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "title",
+    "status",
+    "current_owner",
+    "requested_by",
+    "platform",
+    "deadline",
+    "risk_level",
+    "folder_path",
+    "recurrence_key",
+    "created_at",
+    "updated_at",
+    "scope_lock_active",
+    "change_review_required",
+    "next_gate",
+    "waiting_on_human"
+  ],
+  "properties": {
+    "id": { "type": "string", "x-storage": "persisted" },
+    "title": { "type": "string", "minLength": 1, "x-storage": "persisted" },
+    "status": {
+      "type": "string",
+      "enum": ["intake", "triage", "in_progress", "review", "revise", "approval_pending", "publish_pack_ready", "completed", "archived", "blocked", "canceled"],
+      "x-storage": "persisted"
+    },
+    "current_owner": { "type": "string", "minLength": 1, "x-storage": "persisted" },
+    "requested_by": { "type": "string", "minLength": 1, "x-storage": "persisted" },
+    "platform": { "type": "string", "minLength": 1, "x-storage": "persisted" },
+    "deadline": { "type": ["string", "null"], "format": "date-time", "x-storage": "persisted" },
+    "risk_level": { "type": "string", "enum": ["low", "medium", "high"], "x-storage": "persisted" },
+    "folder_path": { "type": "string", "minLength": 1, "x-storage": "persisted" },
+    "recurrence_key": { "type": ["string", "null"], "x-storage": "persisted" },
+    "created_at": { "type": "string", "format": "date-time", "x-storage": "persisted" },
+    "updated_at": { "type": "string", "format": "date-time", "x-storage": "persisted" },
+    "scope_lock_active": { "type": "boolean", "readOnly": true, "x-storage": "derived" },
+    "change_review_required": { "type": "boolean", "readOnly": true, "x-storage": "derived" },
+    "next_gate": { "type": ["string", "null"], "readOnly": true, "x-storage": "derived" },
+    "waiting_on_human": { "type": "boolean", "readOnly": true, "x-storage": "derived" }
+  }
+}

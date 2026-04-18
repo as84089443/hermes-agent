@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ai-department-os/v1/task.contract.json",
+  "title": "AI Department OS v1 Task Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "project_id",
+    "type",
+    "status",
+    "owner_role",
+    "input_artifact_ids",
+    "output_artifact_id",
+    "due_at",
+    "blocking_reason",
+    "created_at",
+    "completed_at",
+    "ready_for_execution",
+    "overdue",
+    "review_required"
+  ],
+  "properties": {
+    "id": { "type": "string", "x-storage": "persisted" },
+    "project_id": { "type": "string", "x-storage": "persisted" },
+    "type": { "type": "string", "minLength": 1, "x-storage": "persisted" },
+    "status": {
+      "type": "string",
+      "enum": ["queued", "in_progress", "review", "needs_revision", "done", "blocked", "canceled"],
+      "x-storage": "persisted"
+    },
+    "owner_role": { "type": "string", "minLength": 1, "x-storage": "persisted" },
+    "input_artifact_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "x-storage": "persisted"
+    },
+    "output_artifact_id": { "type": ["string", "null"], "x-storage": "persisted" },
+    "due_at": { "type": ["string", "null"], "format": "date-time", "x-storage": "persisted" },
+    "blocking_reason": { "type": ["string", "null"], "x-storage": "persisted" },
+    "created_at": { "type": "string", "format": "date-time", "x-storage": "persisted" },
+    "completed_at": { "type": ["string", "null"], "format": "date-time", "x-storage": "persisted" },
+    "ready_for_execution": { "type": "boolean", "readOnly": true, "x-storage": "derived" },
+    "overdue": { "type": "boolean", "readOnly": true, "x-storage": "derived" },
+    "review_required": { "type": "boolean", "readOnly": true, "x-storage": "derived" }
+  }
+}

@@ -94,44 +94,44 @@ class HermesACPAgent(acp.Agent):
     """ACP Agent implementation wrapping Hermes AIAgent."""
 
     _SLASH_COMMANDS = {
-        "help": "Show available commands",
-        "model": "Show or change current model",
-        "tools": "List available tools",
-        "context": "Show conversation context info",
-        "reset": "Clear conversation history",
-        "compact": "Compress conversation context",
-        "version": "Show Hermes version",
+        "help": "顯示可用指令",
+        "model": "顯示或切換目前模型",
+        "tools": "列出可用工具",
+        "context": "顯示對話上下文資訊",
+        "reset": "清除對話歷史",
+        "compact": "壓縮對話上下文",
+        "version": "顯示 Hermes 版本",
     }
 
     _ADVERTISED_COMMANDS = (
         {
             "name": "help",
-            "description": "List available commands",
+            "description": "列出可用指令",
         },
         {
             "name": "model",
-            "description": "Show current model and provider, or switch models",
-            "input_hint": "model name to switch to",
+            "description": "顯示目前模型與 provider，或切換模型",
+            "input_hint": "要切換的模型名稱",
         },
         {
             "name": "tools",
-            "description": "List available tools with descriptions",
+            "description": "列出可用工具與說明",
         },
         {
             "name": "context",
-            "description": "Show conversation message counts by role",
+            "description": "顯示依角色分組的對話訊息數量",
         },
         {
             "name": "reset",
-            "description": "Clear conversation history",
+            "description": "清除對話歷史",
         },
         {
             "name": "compact",
-            "description": "Compress conversation context",
+            "description": "壓縮對話上下文",
         },
         {
             "name": "version",
-            "description": "Show Hermes version",
+            "description": "顯示 Hermes 版本",
         },
     )
 
@@ -543,18 +543,18 @@ class HermesACPAgent(acp.Agent):
             return f"Error executing /{cmd}: {e}"
 
     def _cmd_help(self, args: str, state: SessionState) -> str:
-        lines = ["Available commands:", ""]
+        lines = ["可用指令：", ""]
         for cmd, desc in self._SLASH_COMMANDS.items():
             lines.append(f"  /{cmd:10s}  {desc}")
         lines.append("")
-        lines.append("Unrecognized /commands are sent to the model as normal messages.")
+        lines.append("無法識別的 /commands 會當成一般訊息送給模型處理。")
         return "\n".join(lines)
 
     def _cmd_model(self, args: str, state: SessionState) -> str:
         if not args:
             model = state.model or getattr(state.agent, "model", "unknown")
             provider = getattr(state.agent, "provider", None) or "auto"
-            return f"Current model: {model}\nProvider: {provider}"
+            return f"目前模型：{model}\nProvider：{provider}"
 
         new_model = args.strip()
         target_provider = None
@@ -581,7 +581,7 @@ class HermesACPAgent(acp.Agent):
         self.session_manager.save_session(state.session_id)
         provider_label = getattr(state.agent, "provider", None) or target_provider or current_provider
         logger.info("Session %s: model switched to %s", state.session_id, new_model)
-        return f"Model switched to: {new_model}\nProvider: {provider_label}"
+        return f"已切換模型為：{new_model}\nProvider：{provider_label}"
 
     def _cmd_tools(self, args: str, state: SessionState) -> str:
         try:
@@ -589,8 +589,8 @@ class HermesACPAgent(acp.Agent):
             toolsets = getattr(state.agent, "enabled_toolsets", None) or ["hermes-acp"]
             tools = get_tool_definitions(enabled_toolsets=toolsets, quiet_mode=True)
             if not tools:
-                return "No tools available."
-            lines = [f"Available tools ({len(tools)}):"]
+                return "目前沒有可用工具。"
+            lines = [f"可用工具（共 {len(tools)} 個）："]
             for t in tools:
                 name = t.get("function", {}).get("name", "?")
                 desc = t.get("function", {}).get("description", "")
@@ -600,41 +600,41 @@ class HermesACPAgent(acp.Agent):
                 lines.append(f"  {name}: {desc}")
             return "\n".join(lines)
         except Exception as e:
-            return f"Could not list tools: {e}"
+            return f"無法列出工具：{e}"
 
     def _cmd_context(self, args: str, state: SessionState) -> str:
         n_messages = len(state.history)
         if n_messages == 0:
-            return "Conversation is empty (no messages yet)."
+            return "目前對話是空的（還沒有訊息）。"
         # Count by role
         roles: dict[str, int] = {}
         for msg in state.history:
             role = msg.get("role", "unknown")
             roles[role] = roles.get(role, 0) + 1
         lines = [
-            f"Conversation: {n_messages} messages",
-            f"  user: {roles.get('user', 0)}, assistant: {roles.get('assistant', 0)}, "
-            f"tool: {roles.get('tool', 0)}, system: {roles.get('system', 0)}",
+            f"對話：共 {n_messages} 則訊息",
+            f"  user：{roles.get('user', 0)}、assistant：{roles.get('assistant', 0)}、"
+            f"tool：{roles.get('tool', 0)}、system：{roles.get('system', 0)}",
         ]
         model = state.model or getattr(state.agent, "model", "")
         if model:
-            lines.append(f"Model: {model}")
+            lines.append(f"模型：{model}")
         return "\n".join(lines)
 
     def _cmd_reset(self, args: str, state: SessionState) -> str:
         state.history.clear()
         self.session_manager.save_session(state.session_id)
-        return "Conversation history cleared."
+        return "已清除對話歷史。"
 
     def _cmd_compact(self, args: str, state: SessionState) -> str:
         if not state.history:
-            return "Nothing to compress — conversation is empty."
+            return "沒有可壓縮內容——目前對話是空的。"
         try:
             agent = state.agent
             if not getattr(agent, "compression_enabled", True):
-                return "Context compression is disabled for this agent."
+                return "這個 agent 已停用上下文壓縮。"
             if not hasattr(agent, "_compress_context"):
-                return "Context compression not available for this agent."
+                return "這個 agent 不支援上下文壓縮。"
 
             from agent.model_metadata import estimate_messages_tokens_rough
 

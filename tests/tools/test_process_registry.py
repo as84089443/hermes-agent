@@ -454,7 +454,7 @@ class TestCheckpoint:
             assert data[0]["watcher_thread_id"] == "42"
             assert data[0]["watcher_interval"] == 60
 
-    def test_recover_enqueues_watchers(self, registry, tmp_path):
+    def test_recover_does_not_reenqueue_watchers(self, registry, tmp_path):
         checkpoint = tmp_path / "procs.json"
         checkpoint.write_text(json.dumps([{
             "session_id": "proc_live",
@@ -468,19 +468,20 @@ class TestCheckpoint:
             "watcher_user_name": "alice",
             "watcher_thread_id": "42",
             "watcher_interval": 60,
+            "notify_on_complete": True,
+            "watch_patterns": ["READY"],
         }]))
         with patch("tools.process_registry.CHECKPOINT_PATH", checkpoint):
             recovered = registry.recover_from_checkpoint()
             assert recovered == 1
-            assert len(registry.pending_watchers) == 1
-            w = registry.pending_watchers[0]
-            assert w["session_id"] == "proc_live"
-            assert w["platform"] == "telegram"
-            assert w["chat_id"] == "123"
-            assert w["user_id"] == "u123"
-            assert w["user_name"] == "alice"
-            assert w["thread_id"] == "42"
-            assert w["check_interval"] == 60
+            assert len(registry.pending_watchers) == 0
+
+            session = registry.get("proc_live")
+            assert session is not None
+            assert session.detached is True
+            assert session.notify_on_complete is False
+            assert session.watcher_interval == 0
+            assert session.watch_patterns == []
 
     def test_recover_skips_watcher_when_no_interval(self, registry, tmp_path):
         checkpoint = tmp_path / "procs.json"

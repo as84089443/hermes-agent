@@ -4,9 +4,11 @@ import os
 import json
 import tempfile
 from pathlib import Path
+from typing import Optional
 from unittest.mock import patch, MagicMock
 
 import pytest
+import anyio
 
 from hermes_cli.config import (
     DEFAULT_CONFIG,
@@ -119,6 +121,403 @@ class TestWebServerEndpoints:
         assert "version" in data
         assert "hermes_home" in data
         assert "active_sessions" in data
+
+    def test_get_control_center(self, monkeypatch, tmp_path):
+        import hermes_cli.web_server as web_server
+
+        wiki_root = tmp_path / "wiki"
+        concepts = wiki_root / "concepts"
+        concepts.mkdir(parents=True)
+        live = concepts / "hermes-upgrade-live-status.md"
+        live.write_text(
+            "# Hermes Upgrade Live Status\n\n"
+            "## 目前主 phase\n"
+            "Phase X — Test\n\n"
+            "## 目前進度摘要\n"
+            "- 已建立測試進度板\n\n"
+            "## 目前阻塞\n"
+            "- 目前沒有 blocker\n\n"
+            "## 下一個 join point\n"
+            "- 補後端驗證\n",
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(web_server, "_resolve_wiki_root", lambda: wiki_root)
+        monkeypatch.setattr(
+            web_server,
+            "_build_session_tracking",
+            lambda sessions: [{
+                "session_id": "sess-1",
+                "title": "測試會話",
+                "decision_state": "進行中",
+                "stage": "正在處理中",
+                "recent_step": "最近一步：搜尋資料",
+                "latest_user_request": "幫我整理 AI 公司第一刀",
+                "attention": "等你拍板是否往下切 UI",
+            }],
+        )
+        monkeypatch.setattr(
+            web_server,
+            "_read_ai_company_execution_status",
+            lambda: {
+                "exists": True,
+                "path": "/tmp/execution.md",
+                "current_goal": "讓指揮台首頁直接看見 AI 公司第一刀正在落地的 implementation tasks，而不是只看靜態摘要。",
+                "implementation_tasks": [
+                    {
+                        "status": "in_progress",
+                        "title": "Control-center API summary payload",
+                        "now": "正在補 implementation_tasks / boss_decisions API 欄位",
+                        "next": "接著補前端卡片",
+                        "verify": "API 回新欄位且測試通過",
+                    }
+                ],
+            },
+        )
+
+        resp = self.client.get("/api/control-center")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "status" in data
+        assert "upgrade" in data
+        assert "cron_jobs" in data
+        assert "tracked_sessions" in data
+        assert "execution" in data
+        assert "implementation_tasks" in data
+        assert "top_goals" in data
+        assert "boss_decisions" in data
+        assert data["upgrade"]["current_phase"] == "Phase X — Test"
+        assert data["upgrade"]["summary"] == ["已建立測試進度板"]
+        assert data["tracked_sessions"][0]["stage"] == "正在處理中"
+        assert data["implementation_tasks"][0]["status"] == "in_progress"
+        assert data["top_goals"][0]["owner"] == "Hermes 公司系統"
+        assert data["top_goals"][0]["session_id"] == "sess-1"
+        assert data["boss_decisions"][0]["decision_state"] == "進行中"
+
+    def test_control_center_text_helpers_filter_low_signal_noise(self):
+        import hermes_cli.web_server as web_server
+
+        noisy = '{"output": "[Command interrupted]", "exit_code": 130, "error": null}'
+        assert web_server._is_low_signal_session_text(noisy) is True
+        assert web_server._first_meaningful_line(noisy) is None
+
+        mixed = "Markdown task list\n" + noisy + "\n目前主 phase"
+        assert web_server._first_meaningful_line(mixed) == "目前主 phase"
+
+    def test_build_session_tracking_entry_skips_noisy_latest_reply(self):
+        import hermes_cli.web_server as web_server
+
+        session = {
+            "id": "sess-noise",
+            "title": "Noisy Session",
+            "is_active": True,
+            "message_count": 4,
+            "tool_call_count": 1,
+            "last_active": 1,
+            "model": "gpt-5.4",
+            "preview": None,
+        }
+        messages = [
+            {"role": "user", "content": "Markdown task list\n{\"output\": \"[Command interrupted]\", \"exit_code\": 130, \"error\": null}\n請直接往下推進"},
+            {"role": "assistant", "content": "{\"output\": \"[Command interrupted]\", \"exit_code\": 130, \"error\": null}\n目前主 phase"},
+            {"role": "tool", "tool_name": "search_files", "content": '{"matches": []}'},
+        ]
+
+        entry = web_server._build_session_tracking_entry(session, messages)
+        assert entry["latest_user_request"] == "請直接往下推進"
+        assert entry["latest_reply"] == "目前主 phase"
+        assert entry["recent_step"] == "最近一步：搜尋資料"
+
+    def test_chat_send_runs_agent_and_returns_session(self, monkeypatch):
+        import hermes_cli.web_server as web_server
+
+        async def fake_run_web_chat_turn(*, message: str, session_id: Optional[str] = None):
+            assert message == "你好，Hermes"
+            assert session_id is None
+            return {
+                "session_id": "web_test_session",
+                "final_response": "你好，我在。",
+                "usage": {"input_tokens": 10, "output_tokens": 20, "total_tokens": 30},
+            }
+
+        monkeypatch.setattr(web_server, "_run_web_chat_turn", fake_run_web_chat_turn)
+
+        resp = self.client.post("/api/chat/send", json={"message": "你好，Hermes"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["session_id"] == "web_test_session"
+        assert data["final_response"] == "你好，我在。"
+        assert data["usage"]["total_tokens"] == 30
+
+    def test_chat_send_rejects_empty_message(self):
+        resp = self.client.post("/api/chat/send", json={"message": "   "})
+        assert resp.status_code == 400
+        assert "Message is required" in resp.text
+
+    def test_project_crud_and_push_endpoints(self, monkeypatch):
+        import hermes_cli.web_server as web_server
+
+        async def fake_push(project_id: str):
+            return {
+                "id": project_id,
+                "title": "Autopilot Project",
+                "status": "in_progress",
+                "main_phase": "需求整理",
+                "current_owner": "Hermes 公司系統",
+                "next_action_summary": "直接往下推進下一步",
+                "autopilot_enabled": True,
+                "open_approvals": 0,
+                "open_tasks": 1,
+                "tasks": [],
+                "approvals": [],
+                "recent_events": [],
+                "updated_at": 1,
+            }
+
+        monkeypatch.setattr(web_server, "_push_project_forward", fake_push)
+
+        create_resp = self.client.post(
+            "/api/projects",
+            json={
+                "title": "Autopilot Project",
+                "phase_goal": "讓 Hermes 自動往下推進專案",
+                "next_action_summary": "直接往下推進下一步",
+            },
+        )
+        assert create_resp.status_code == 200
+        project = create_resp.json()
+        assert project["title"] == "Autopilot Project"
+        assert project["main_phase"] == "需求整理"
+
+        list_resp = self.client.get("/api/projects")
+        assert list_resp.status_code == 200
+        projects = list_resp.json()["projects"]
+        assert any(item["title"] == "Autopilot Project" for item in projects)
+
+        push_resp = self.client.post(f"/api/projects/{project['id']}/push")
+        assert push_resp.status_code == 200
+        pushed = push_resp.json()["project"]
+        assert pushed["title"] == "Autopilot Project"
+
+    def test_project_approval_request_and_decide(self):
+        create_resp = self.client.post("/api/projects", json={"title": "Approval Demo"})
+        assert create_resp.status_code == 200
+        project = create_resp.json()
+
+        approval_resp = self.client.post(
+            f"/api/projects/{project['id']}/approvals/request",
+            json={"title": "請確認是否放行", "summary": "這個專案已需要你拍板下一步"},
+        )
+        assert approval_resp.status_code == 200
+        approval = approval_resp.json()["approval"]
+        assert approval["status"] == "pending"
+
+        queue_resp = self.client.get("/api/approvals")
+        assert queue_resp.status_code == 200
+        assert any(item["id"] == approval["id"] for item in queue_resp.json()["approvals"])
+
+        decide_resp = self.client.post(
+            f"/api/approvals/{approval['id']}/decide",
+            json={"decision": "approved", "notes": "可以繼續"},
+        )
+        assert decide_resp.status_code == 200
+        decided = decide_resp.json()["approval"]
+        assert decided["status"] == "approved"
+
+    def test_project_review_verify_and_escalate_endpoints(self):
+        create_resp = self.client.post("/api/projects", json={"title": "Writeback Demo"})
+        assert create_resp.status_code == 200
+        project = create_resp.json()
+        project_id = project["id"]
+
+        review_resp = self.client.post(
+            f"/api/projects/{project_id}/review",
+            json={"verdict": "PASS", "notes": "spec 與品質都過"},
+        )
+        assert review_resp.status_code == 200
+        assert review_resp.json()["task"]["status"] == "review_passed"
+
+        verify_resp = self.client.post(
+            f"/api/projects/{project_id}/verify",
+            json={"summary": "手動驗證通過", "passed": True},
+        )
+        assert verify_resp.status_code == 200
+        assert verify_resp.json()["artifact"]["artifact_type"] == "verification-report"
+
+        escalate_resp = self.client.post(
+            f"/api/projects/{project_id}/escalate",
+            json={"reason": "缺少外部依賴，先標記 blocked"},
+        )
+        assert escalate_resp.status_code == 200
+        assert escalate_resp.json()["project"]["status"] == "blocked"
+
+    def test_push_project_forward_writes_artifact_from_sqlite_row_task(self, monkeypatch):
+        import hermes_cli.web_server as web_server
+
+        async def fake_run_web_chat_turn(*, message: str, session_id: str | None = None):
+            return {
+                "session_id": "sess_push_row",
+                "final_response": "已完成一輪 project push。",
+            }
+
+        monkeypatch.setattr(web_server, "_run_web_chat_turn", fake_run_web_chat_turn)
+
+        create_resp = self.client.post(
+            "/api/projects",
+            json={
+                "title": "Push Row Fix",
+                "phase_goal": "驗證 sqlite Row task 可完成 push",
+                "next_action_summary": "直接往下推進下一步",
+            },
+        )
+        assert create_resp.status_code == 200
+        project_id = create_resp.json()["id"]
+
+        project = anyio.run(web_server._push_project_forward, project_id)
+
+        assert project["id"] == project_id
+        assert project["last_cycle_status"] == "executed"
+        assert project["tasks"][0]["status"] == "in_progress"
+        assert project["tasks"][0]["output_artifact_id"]
+        assert any(event["event_type"] == "artifact_written" for event in project["recent_events"])
+        assert any(event["event_type"] == "project_pushed" for event in project["recent_events"])
+
+    def test_get_session_detail_includes_task_charter(self, monkeypatch):
+        import hermes_cli.web_server as web_server
+
+        class FakeDB:
+            def resolve_session_id(self, session_id):
+                return "sess-123"
+
+            def get_session(self, session_id):
+                return {
+                    "id": session_id,
+                    "title": "測試對話",
+                    "preview": "請幫我整理 AI 公司第一刀",
+                }
+
+            def get_messages(self, session_id):
+                return [
+                    {"role": "user", "content": "請幫我整理 AI 公司第一刀"},
+                    {"role": "assistant", "content": "我會先把第一刀拆成 contract、API、dashboard 三段。"},
+                ]
+
+            def close(self):
+                return None
+
+        monkeypatch.setattr("hermes_state.SessionDB", FakeDB)
+
+        resp = self.client.get("/api/sessions/sess-123")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "task_charter" in data
+        assert data["task_charter"]["goal"] == "請幫我整理 AI 公司第一刀"
+        assert data["task_charter"]["status"] == "本輪已有回覆"
+        assert data["task_charter"]["owner"] == "Hermes 公司系統"
+        assert data["task_charter"]["decision_state"] == "可追蹤"
+        assert data["task_charter"]["recent_step"] == "我會先把第一刀拆成 contract、API、dashboard 三段。"
+        assert data["task_charter"]["stage"] == "本輪已有回覆"
+        assert data["task_charter"]["blocker"] is None
+
+    def test_get_control_center_filters_cron_noise_from_tracked_sessions(self, monkeypatch):
+        import hermes_cli.web_server as web_server
+
+        class FakeDB:
+            def get_messages(self, session_id):
+                return [
+                    {"role": "user", "content": "正常交辦"},
+                    {"role": "assistant", "content": "正常回覆"},
+                ]
+
+            def close(self):
+                return None
+
+        monkeypatch.setattr("hermes_state.SessionDB", FakeDB)
+        sessions = [
+            {"id": "cron-1", "source": "cron", "title": "cron session", "is_active": True},
+            {"id": "cli-1", "source": "cli", "title": "normal session", "is_active": True, "message_count": 2, "tool_call_count": 0},
+        ]
+        tracked = web_server._build_session_tracking(sessions)
+        assert len(tracked) == 1
+        assert tracked[0]["title"] == "normal session"
+
+    def test_get_control_center_prefers_operator_sessions_when_recent_list_is_cron_heavy(self, monkeypatch, tmp_path):
+        import hermes_cli.web_server as web_server
+
+        wiki_root = tmp_path / "wiki"
+        concepts = wiki_root / "concepts"
+        concepts.mkdir(parents=True)
+        (concepts / "hermes-upgrade-live-status.md").write_text(
+            "# Hermes Upgrade Live Status\n\n"
+            "## 目前主 phase\n"
+            "Phase X — Test\n\n"
+            "## 目前進度摘要\n"
+            "- 已建立測試進度板\n\n"
+            "## 目前阻塞\n"
+            "- 目前沒有 blocker\n\n"
+            "## 下一個 join point\n"
+            "- 補後端驗證\n",
+            encoding="utf-8",
+        )
+
+        async def fake_get_sessions(limit=20, offset=0):
+            return {
+                "sessions": [
+                    *[
+                        {"id": f"cron-{idx}", "source": "cron", "title": f"cron {idx}", "is_active": True}
+                        for idx in range(12)
+                    ],
+                    {"id": "cli-meaningful", "source": "cli", "title": "normal session", "is_active": True, "message_count": 4, "tool_call_count": 0},
+                ]
+            }
+
+        async def fake_status():
+            return {"gateway_running": True, "gateway_state": "running"}
+
+        class FakeProjectDB:
+            def list_projects(self, limit=50):
+                return []
+
+            def list_approvals(self, status="pending", limit=50):
+                return []
+
+            def close(self):
+                return None
+
+        monkeypatch.setattr(web_server, "_resolve_wiki_root", lambda: wiki_root)
+        monkeypatch.setattr(web_server, "get_sessions", fake_get_sessions)
+        monkeypatch.setattr(web_server, "get_status", fake_status)
+        monkeypatch.setattr(web_server, "_read_ai_company_execution_status", lambda: {"exists": True, "path": "/tmp/execution.md", "current_goal": "test goal", "implementation_tasks": []})
+        monkeypatch.setattr(web_server, "_build_session_tracking", lambda sessions: [{"session_id": s["id"], "title": s["title"], "message_count": s.get("message_count", 0), "latest_user_request": "請往下推進", "latest_reply": "已開始", "attention": None, "decision_state": "進行中", "stage": "正在處理中"} for s in sessions])
+        monkeypatch.setattr(web_server, "_project_db", FakeProjectDB)
+
+        resp = self.client.get("/api/control-center")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["tracked_sessions"][0]["session_id"] == "cli-meaningful"
+        assert data["top_goals"][0]["session_id"] == "cli-meaningful"
+
+    def test_select_primary_goal_session_skips_empty_sessions(self):
+        import hermes_cli.web_server as web_server
+
+        tracked_sessions = [
+            {
+                "session_id": "empty-active",
+                "message_count": 0,
+                "latest_user_request": None,
+                "latest_reply": None,
+                "attention": None,
+            },
+            {
+                "session_id": "meaningful-session",
+                "message_count": 6,
+                "latest_user_request": "請直接往下推進",
+                "latest_reply": "我已開始實作",
+                "attention": None,
+            },
+        ]
+
+        assert web_server._select_primary_goal_session(tracked_sessions) == "meaningful-session"
 
     def test_get_status_filters_unconfigured_gateway_platforms(self, monkeypatch):
         import gateway.config as gateway_config

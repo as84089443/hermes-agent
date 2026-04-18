@@ -61,7 +61,7 @@ All fields are optional. Missing values inherit from the ``default`` skin.
       goodbye: "Goodbye! ⚕"              # Shown on exit
       response_label: " ⚕ Hermes "       # Response box header label
       prompt_symbol: "❯ "                # Input prompt symbol
-      help_header: "(^_^)? Commands"      # /help header text
+      help_header: "(^_^)? 可用指令"      # /help header text
 
     # Tool prefix: character for tool output lines (default: ┊)
     tool_prefix: "┊"
@@ -182,7 +182,7 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
             "goodbye": "Goodbye! ⚕",
             "response_label": " ⚕ Hermes ",
             "prompt_symbol": "❯ ",
-            "help_header": "(^_^)? Available Commands",
+            "help_header": "(^_^)? 可用指令",
         },
         "tool_prefix": "┊",
     },
@@ -226,7 +226,7 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
             "goodbye": "Farewell, warrior! ⚔",
             "response_label": " ⚔ Ares ",
             "prompt_symbol": "⚔ ❯ ",
-            "help_header": "(⚔) Available Commands",
+            "help_header": "(⚔) 可用指令",
         },
         "tool_prefix": "╎",
         "banner_logo": """[bold #A3261F] █████╗ ██████╗ ███████╗███████╗       █████╗  ██████╗ ███████╗███╗   ██╗████████╗[/]
@@ -277,7 +277,7 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
             "goodbye": "Goodbye! ⚕",
             "response_label": " ⚕ Hermes ",
             "prompt_symbol": "❯ ",
-            "help_header": "[?] Available Commands",
+            "help_header": "[?] 可用指令",
         },
         "tool_prefix": "┊",
     },
@@ -308,7 +308,7 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
             "goodbye": "Goodbye! ⚕",
             "response_label": " ⚕ Hermes ",
             "prompt_symbol": "❯ ",
-            "help_header": "(^_^)? Available Commands",
+            "help_header": "(^_^)? 可用指令",
         },
         "tool_prefix": "┊",
     },
@@ -427,7 +427,7 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
             "goodbye": "Fair winds! Ψ",
             "response_label": " Ψ Poseidon ",
             "prompt_symbol": "Ψ ❯ ",
-            "help_header": "(Ψ) Available Commands",
+            "help_header": "(Ψ) 可用指令",
         },
         "tool_prefix": "│",
         "banner_logo": """[bold #B8E8FF]██████╗  ██████╗ ███████╗███████╗██╗██████╗  ██████╗ ███╗   ██╗       █████╗  ██████╗ ███████╗███╗   ██╗████████╗[/]
@@ -491,7 +491,7 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
             "goodbye": "The boulder waits. ◉",
             "response_label": " ◉ Sisyphus ",
             "prompt_symbol": "◉ ❯ ",
-            "help_header": "(◉) Available Commands",
+            "help_header": "(◉) 可用指令",
         },
         "tool_prefix": "│",
         "banner_logo": """[bold #F5F5F5]███████╗██╗███████╗██╗   ██╗██████╗ ██╗  ██╗██╗   ██╗███████╗       █████╗  ██████╗ ███████╗███╗   ██╗████████╗[/]
@@ -556,7 +556,7 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
             "goodbye": "Flame out! ✦",
             "response_label": " ✦ Charizard ",
             "prompt_symbol": "✦ ❯ ",
-            "help_header": "(✦) Available Commands",
+            "help_header": "(✦) 可用指令",
         },
         "tool_prefix": "│",
         "banner_logo": """[bold #FFF0D4] ██████╗██╗  ██╗ █████╗ ██████╗ ██╗███████╗ █████╗ ██████╗ ██████╗        █████╗  ██████╗ ███████╗███╗   ██╗████████╗[/]
@@ -730,7 +730,7 @@ def get_active_prompt_symbol(fallback: str = "❯ ") -> str:
 
 
 
-def get_active_help_header(fallback: str = "(^_^)? Available Commands") -> str:
+def get_active_help_header(fallback: str = "(^_^)? 可用指令") -> str:
     """Get the /help header from the active skin."""
     try:
         return get_active_skin().get_branding("help_header", fallback)

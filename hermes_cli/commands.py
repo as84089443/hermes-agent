@@ -373,8 +373,8 @@ def gateway_help_lines() -> list[str]:
             if a.replace("-", "_") == cmd.name.replace("-", "_") and a != cmd.name:
                 continue
             alias_parts.append(f"`/{a}`")
-        alias_note = f" (alias: {', '.join(alias_parts)})" if alias_parts else ""
-        lines.append(f"`/{cmd.name}{args}` -- {cmd.description}{alias_note}")
+        alias_note = f"（別名：{', '.join(alias_parts)}）" if alias_parts else ""
+        lines.append(f"`/{cmd.name}{args}` -- {_localized_command_description(cmd)}{alias_note}")
     return lines
 
 
@@ -392,7 +392,7 @@ def telegram_bot_commands() -> list[tuple[str, str]]:
             continue
         tg_name = _sanitize_telegram_name(cmd.name)
         if tg_name:
-            result.append((tg_name, cmd.description))
+            result.append((tg_name, _localized_command_description(cmd)))
     return result
 
 

@@ -3308,11 +3308,11 @@ class HermesCLI:
         # Handle /rollback diff <N>
         if args[0].lower() == "diff":
             if len(args) < 2:
-                print("  Usage: /rollback diff <N>")
+                print("  用法：/rollback diff <N>")
                 return
             checkpoints = mgr.list_checkpoints(cwd)
             if not checkpoints:
-                print(f"  No checkpoints found for {cwd}")
+                print(f"  在 {cwd} 找不到 checkpoints")
                 return
             target_hash = self._resolve_checkpoint_ref(args[1], checkpoints)
             if not target_hash:
@@ -3322,7 +3322,7 @@ class HermesCLI:
                 stat = result.get("stat", "")
                 diff = result.get("diff", "")
                 if not stat and not diff:
-                    print("  No changes since this checkpoint.")
+                    print("  自這個 checkpoint 以來沒有變更。")
                 else:
                     if stat:
                         print(f"\n{stat}")
@@ -3331,7 +3331,7 @@ class HermesCLI:
                         diff_lines = diff.splitlines()
                         if len(diff_lines) > 80:
                             print("\n".join(diff_lines[:80]))
-                            print(f"\n  ... ({len(diff_lines) - 80} more lines, showing first 80)")
+                            print(f"\n  ...（還有 {len(diff_lines) - 80} 行，先顯示前 80 行）")
                         else:
                             print(f"\n{diff}")
             else:
@@ -3341,7 +3341,7 @@ class HermesCLI:
         # Resolve checkpoint reference (number or hash)
         checkpoints = mgr.list_checkpoints(cwd)
         if not checkpoints:
-            print(f"  No checkpoints found for {cwd}")
+            print(f"  在 {cwd} 找不到 checkpoints")
             return
 
         target_hash = self._resolve_checkpoint_ref(args[0], checkpoints)
@@ -3354,16 +3354,16 @@ class HermesCLI:
         result = mgr.restore(cwd, target_hash, file_path=file_path)
         if result["success"]:
             if file_path:
-                print(f"  ✅ Restored {file_path} from checkpoint {result['restored_to']}: {result['reason']}")
+                print(f"  ✅ 已從 checkpoint {result['restored_to']} 還原 {file_path}：{result['reason']}")
             else:
-                print(f"  ✅ Restored to checkpoint {result['restored_to']}: {result['reason']}")
-            print("  A pre-rollback snapshot was saved automatically.")
+                print(f"  ✅ 已還原到 checkpoint {result['restored_to']}：{result['reason']}")
+            print("  已自動儲存 rollback 前快照。")
 
             # Also undo the last conversation turn so the agent's context
             # matches the restored filesystem state
             if self.conversation_history:
                 self.undo_last()
-                print("  Chat turn undone to match restored file state.")
+                print("  已同步復原聊天回合，讓內容狀態與還原後檔案一致。")
         else:
             print(f"  ❌ {result['error']}")
 
@@ -3374,7 +3374,7 @@ class HermesCLI:
             if 0 <= idx < len(checkpoints):
                 return checkpoints[idx]["hash"]
             else:
-                print(f"  Invalid checkpoint number. Use 1-{len(checkpoints)}.")
+                print(f"  無效的 checkpoint 編號。請使用 1-{len(checkpoints)}。")
                 return None
         except ValueError:
             # Treat as a git hash
@@ -3401,11 +3401,11 @@ class HermesCLI:
         if subcmd in ("list", "ls"):
             snaps = list_quick_snapshots()
             if not snaps:
-                print("  No state snapshots yet.")
-                print("  Create one: /snapshot create [label]")
+                print("  目前還沒有 state snapshots。")
+                print("  建立方式：/snapshot create [label]")
                 return
-            print(f"  State snapshots ({display_hermes_home()}/state-snapshots/):\n")
-            print(f"  {'#':>3}  {'ID':<35} {'Files':>5} {'Size':>10} {'Label'}")
+            print(f"  State snapshots（{display_hermes_home()}/state-snapshots/）：\n")
+            print(f"  {'#':>3}  {'ID':<35} {'檔案數':>5} {'大小':>10} {'標籤'}")
             print(f"  {'─'*3}  {'─'*35} {'─'*5} {'─'*10} {'─'*20}")
             for i, s in enumerate(snaps, 1):
                 size = s.get("total_size", 0)
@@ -3422,17 +3422,17 @@ class HermesCLI:
             label = " ".join(parts[2:]) if len(parts) > 2 else None
             snap_id = create_quick_snapshot(label=label)
             if snap_id:
-                print(f"  Snapshot created: {snap_id}")
+                print(f"  已建立 snapshot：{snap_id}")
             else:
-                print("  No state files found to snapshot.")
+                print("  找不到可用來建立 snapshot 的 state 檔案。")
 
         elif subcmd in ("restore", "rewind"):
             if len(parts) < 3:
-                print("  Usage: /snapshot restore <snapshot-id>")
+                print("  用法：/snapshot restore <snapshot-id>")
                 # Show hint with most recent snapshot
                 snaps = list_quick_snapshots(limit=1)
                 if snaps:
-                    print(f"  Most recent: {snaps[0]['id']}")
+                    print(f"  最近一個：{snaps[0]['id']}")
                 return
             snap_id = parts[2]
             # Allow restore by number (1-indexed)
@@ -3442,15 +3442,15 @@ class HermesCLI:
                 if 1 <= idx <= len(snaps):
                     snap_id = snaps[idx - 1]["id"]
                 else:
-                    print(f"  Invalid snapshot number. Use 1-{len(snaps)}.")
+                    print(f"  無效的 snapshot 編號。請使用 1-{len(snaps)}。")
                     return
             except ValueError:
                 pass
             if restore_quick_snapshot(snap_id):
-                print(f"  Restored state from: {snap_id}")
-                print("  Restart recommended for state.db changes to take effect.")
+                print(f"  已從 snapshot 還原 state：{snap_id}")
+                print("  若涉及 state.db 變更，建議重新啟動後再使用。")
             else:
-                print(f"  Snapshot not found: {snap_id}")
+                print(f"  找不到 snapshot：{snap_id}")
 
         elif subcmd == "prune":
             keep = 20
@@ -3458,14 +3458,14 @@ class HermesCLI:
                 try:
                     keep = int(parts[2])
                 except ValueError:
-                    print("  Usage: /snapshot prune [keep-count]")
+                    print("  用法：/snapshot prune [keep-count]")
                     return
             deleted = prune_quick_snapshots(keep=keep)
-            print(f"  Pruned {deleted} old snapshot(s) (keeping {keep}).")
+            print(f"  已清理 {deleted} 個舊 snapshot（保留 {keep} 個）。")
 
         else:
-            print(f"  Unknown subcommand: {subcmd}")
-            print("  Usage: /snapshot [list|create [label]|restore <id>|prune [N]]")
+            print(f"  未知的子指令：{subcmd}")
+            print("  用法：/snapshot [list|create [label]|restore <id>|prune [N]]")
 
     def _handle_stop_command(self):
         """Handle /stop — kill all running background processes.
@@ -3509,31 +3509,31 @@ class HermesCLI:
             else:
                 _cprint(f"  {_DIM}(>_<) Clipboard has an image but extraction failed{_RST}")
         else:
-            _cprint(f"  {_DIM}(._.) No image found in clipboard{_RST}")
+            _cprint(f"  {_DIM}(._.) 剪貼簿裡沒有找到圖片{_RST}")
 
     def _handle_image_command(self, cmd_original: str):
         """Handle /image <path> — attach a local image file for the next prompt."""
         raw_args = (cmd_original.split(None, 1)[1].strip() if " " in cmd_original else "")
         if not raw_args:
             hint = _termux_example_image_path() if _is_termux_environment() else "/path/to/image.png"
-            _cprint(f"  {_DIM}Usage: /image <path>  e.g. /image {hint}{_RST}")
+            _cprint(f"  {_DIM}用法：/image <path>，例如 /image {hint}{_RST}")
             return
 
         path_token, _remainder = _split_path_input(raw_args)
         image_path = _resolve_attachment_path(path_token)
         if image_path is None:
-            _cprint(f"  {_DIM}(>_<) File not found: {path_token}{_RST}")
+            _cprint(f"  {_DIM}(>_<) 找不到檔案：{path_token}{_RST}")
             return
         if image_path.suffix.lower() not in _IMAGE_EXTENSIONS:
-            _cprint(f"  {_DIM}(._.) Not a supported image file: {image_path.name}{_RST}")
+            _cprint(f"  {_DIM}(._.) 這不是支援的圖片檔：{image_path.name}{_RST}")
             return
 
         self._attached_images.append(image_path)
-        _cprint(f"  📎 Attached image: {image_path.name}")
+        _cprint(f"  📎 已附加圖片：{image_path.name}")
         if _remainder:
-            _cprint(f"  {_DIM}Now type your prompt (or use --image in single-query mode): {_remainder}{_RST}")
+            _cprint(f"  {_DIM}現在輸入你的提示即可（或在單次查詢模式使用 --image）：{_remainder}{_RST}")
         elif _is_termux_environment():
-            _cprint(f"  {_DIM}Tip: type your next message, or run hermes chat -q --image {_termux_example_image_path(image_path.name)} \"What do you see?\"{_RST}")
+            _cprint(f"  {_DIM}提示：直接輸入下一則訊息，或執行 hermes chat -q --image {_termux_example_image_path(image_path.name)} \"你看到了什麼？\"{_RST}")
 
     def _preprocess_images_with_vision(self, text: str, images: list, *, announce: bool = True) -> str:
         """Analyze attached images via the vision tool and return enriched text.
@@ -3737,10 +3737,10 @@ class HermesCLI:
 
         try:
             from hermes_cli.skin_engine import get_active_help_header
-            header = get_active_help_header("(^_^)? Available Commands")
+            header = get_active_help_header("(^_^)? 可用指令")
         except Exception:
-            header = "(^_^)? Available Commands"
-        header = (header or "").strip() or "(^_^)? Available Commands"
+            header = "(^_^)? 可用指令"
+        header = (header or "").strip() or "(^_^)? 可用指令"
         inner_width = 55
         if len(header) > inner_width:
             header = header[:inner_width]
@@ -3756,30 +3756,31 @@ class HermesCLI:
                 ChatConsole().print(f"    [bold {_accent_hex()}]{cmd:<15}[/] [dim]-[/] {_escape(desc)}")
 
         if _skill_commands:
-            _cprint(f"\n  ⚡ {_BOLD}Skill Commands{_RST} ({len(_skill_commands)} installed):")
+            _cprint(f"\n  ⚡ {_BOLD}技能指令{_RST}（已安裝 {len(_skill_commands)} 個）：")
             for cmd, info in sorted(_skill_commands.items()):
+                desc = info.get("zh_description") or info.get("description", "")
                 ChatConsole().print(
-                    f"    [bold {_accent_hex()}]{cmd:<22}[/] [dim]-[/] {_escape(info['description'])}"
+                    f"    [bold {_accent_hex()}]{cmd:<22}[/] [dim]-[/] {_escape(desc)}"
                 )
 
-        _cprint(f"\n  {_DIM}Tip: Just type your message to chat with Hermes!{_RST}")
-        _cprint(f"  {_DIM}Multi-line: Alt+Enter for a new line{_RST}")
+        _cprint(f"\n  {_DIM}提示：直接輸入訊息就能和 Hermes 對話！{_RST}")
+        _cprint(f"  {_DIM}多行輸入：Alt+Enter 可換行{_RST}")
         if _is_termux_environment():
-            _cprint(f"  {_DIM}Attach image: /image {_termux_example_image_path()} or start your prompt with a local image path{_RST}\n")
+            _cprint(f"  {_DIM}附加圖片：/image {_termux_example_image_path()}，或在提示前面直接放本機圖片路徑{_RST}\n")
         else:
-            _cprint(f"  {_DIM}Paste image: Alt+V (or /paste){_RST}\n")
+            _cprint(f"  {_DIM}貼上圖片：Alt+V（或 /paste）{_RST}\n")
     
     def show_tools(self):
         """Display available tools with kawaii ASCII art."""
         tools = get_tool_definitions(enabled_toolsets=self.enabled_toolsets, quiet_mode=True)
         
         if not tools:
-            print("(;_;) No tools available")
+            print("(;_;) 目前沒有可用工具")
             return
         
         # Header
         print()
-        title = "(^_^)/ Available Tools"
+        title = "(^_^)/ 可用工具"
         width = 78
         pad = width - len(title)
         print("+" + "-" * width + "+")
@@ -3808,7 +3809,7 @@ class HermesCLI:
                 print(f"    * {name:<20} - {desc}")
             print()
         
-        print(f"  Total: {len(tools)} tools  ヽ(^o^)ノ")
+        print(f"  總計：{len(tools)} 個工具  ヽ(^o^)ノ")
         print()
 
     def _handle_tools_command(self, cmd: str):
@@ -3841,15 +3842,15 @@ class HermesCLI:
 
         names = parts[2:]
         if not names:
-            print(f"(._.) Usage: /tools {subcommand} <name> [name ...]")
-            print(f"  Built-in toolset:  /tools {subcommand} web")
-            print(f"  MCP tool:          /tools {subcommand} github:create_issue")
+            print(f"(._.) 用法：/tools {subcommand} <name> [name ...]")
+            print(f"  內建工具集：  /tools {subcommand} web")
+            print(f"  MCP 工具：     /tools {subcommand} github:create_issue")
             return
 
         # Apply the change directly — the user typing the command is implicit
         # consent.  Do NOT use input() here; it hangs inside prompt_toolkit's
         # TUI event loop (known pitfall).
-        verb = "Disabling" if subcommand == "disable" else "Enabling"
+        verb = "停用中" if subcommand == "disable" else "啟用中"
         label = ", ".join(names)
         _cprint(f"{_ACCENT}{verb} {label}...{_RST}")
 
@@ -3869,7 +3870,7 @@ class HermesCLI:
         
         # Header
         print()
-        title = "(^_^)b Available Toolsets"
+        title = "(^_^)b 可用工具集"
         width = 58
         pad = width - len(title)
         print("+" + "-" * width + "+")
@@ -3888,10 +3889,10 @@ class HermesCLI:
                 print(f"  {marker} {name:<18} [{tool_count:>2} tools] - {desc}")
         
         print()
-        print("  (*) = currently enabled")
+        print("  (*) = 目前已啟用")
         print()
-        print("  Tip: Use 'all' or '*' to enable all toolsets")
-        print("  Example: python cli.py --toolsets web,terminal")
+        print("  提示：使用 'all' 或 '*' 可一次啟用全部工具集")
+        print("  例如：python cli.py --toolsets web,terminal")
         print()
     
     def _handle_profile_command(self):
@@ -3993,11 +3994,11 @@ class HermesCLI:
 
         print()
         if reason == "history":
-            print("(._.) No messages in the current chat yet — here are recent sessions you can resume:")
+            print("(._.) 目前這個聊天還沒有訊息——下面是你可以恢復的近期對話：")
         else:
-            print("  Recent sessions:")
+            print("  近期對話：")
         print()
-        print(f"  {'Title':<32} {'Preview':<40} {'Last Active':<13} {'ID'}")
+        print(f"  {'標題':<32} {'預覽':<40} {'最近活動':<13} {'ID'}")
         print(f"  {'─' * 32} {'─' * 40} {'─' * 13} {'─' * 24}")
         for session in sessions:
             title = (session.get("title") or "—")[:30]
@@ -4005,7 +4006,7 @@ class HermesCLI:
             last_active = _relative_time(session.get("last_active"))
             print(f"  {title:<32} {preview:<40} {last_active:<13} {session['id']}")
         print()
-        print("  Use /resume <session id or title> to continue where you left off.")
+        print("  用 /resume <session id 或標題> 接著上次的位置繼續。")
         print()
         return True
 
@@ -4013,7 +4014,7 @@ class HermesCLI:
         """Display conversation history."""
         if not self.conversation_history:
             if not self._show_recent_sessions(reason="history"):
-                print("(._.) No conversation history yet.")
+                print("(._.) 目前還沒有對話歷史。")
             return
 
         preview_limit = 400
@@ -4025,14 +4026,13 @@ class HermesCLI:
             if not hidden_tool_messages:
                 return
 
-            noun = "message" if hidden_tool_messages == 1 else "messages"
-            print("\n  [Tools]")
-            print(f"    ({hidden_tool_messages} tool {noun} hidden)")
+            print("\n  [工具]")
+            print(f"    （已隱藏 {hidden_tool_messages} 則工具訊息）")
             hidden_tool_messages = 0
 
         print()
         print("+" + "-" * 50 + "+")
-        print("|" + " " * 12 + "(^_^) Conversation History" + " " * 11 + "|")
+        print("|" + " " * 13 + "(^_^) 對話歷史" + " " * 14 + "|")
         print("+" + "-" * 50 + "+")
 
         for msg in self.conversation_history:
@@ -4066,10 +4066,10 @@ class HermesCLI:
             elif tool_calls:
                 tool_count = len(tool_calls)
                 noun = "call" if tool_count == 1 else "calls"
-                preview = f"(requested {tool_count} tool {noun})"
+                preview = f"（要求了 {tool_count} 次工具呼叫）"
                 suffix = ""
             else:
-                preview = "(no text response)"
+                preview = "（沒有文字回覆）"
                 suffix = ""
             print(f"    {preview}{suffix}")
 
@@ -4158,10 +4158,10 @@ class HermesCLI:
         target = parts[1].strip() if len(parts) > 1 else ""
 
         if not target:
-            _cprint("  Usage: /resume <session_id_or_title>")
+            _cprint("  用法：/resume <session_id_or_title>")
             if self._show_recent_sessions(reason="resume"):
                 return
-            _cprint("  Tip:   Use /history or `hermes sessions list` to find sessions.")
+            _cprint("  提示：可用 /history 或 `hermes sessions list` 找到對話。")
             return
 
         if not self._session_db:
@@ -4239,11 +4239,11 @@ class HermesCLI:
         Inspired by Claude Code's /branch command.
         """
         if not self.conversation_history:
-            _cprint("  No conversation to branch — send a message first.")
+            _cprint("  目前沒有可分支的對話——請先送出一則訊息。")
             return
 
         if not self._session_db:
-            _cprint("  Session database not available.")
+            _cprint("  Session 資料庫目前不可用。")
             return
 
         parts = cmd_original.split(None, 1)
@@ -4288,7 +4288,7 @@ class HermesCLI:
                 parent_session_id=parent_session_id,
             )
         except Exception as e:
-            _cprint(f"  Failed to create branch session: {e}")
+            _cprint(f"  建立分支對話失敗：{e}")
             return
 
         # Copy conversation history to the new session
@@ -4336,16 +4336,16 @@ class HermesCLI:
 
         msg_count = len([m for m in self.conversation_history if m.get("role") == "user"])
         _cprint(
-            f"  ⑂ Branched session \"{branch_title}\""
-            f" ({msg_count} user message{'s' if msg_count != 1 else ''})"
+            f"  ⑂ 已建立分支對話「{branch_title}」"
+            f"（{msg_count} 則使用者訊息）"
         )
-        _cprint(f"  Original session: {parent_session_id}")
-        _cprint(f"  Branch session:   {new_session_id}")
+        _cprint(f"  原始對話：{parent_session_id}")
+        _cprint(f"  分支對話：{new_session_id}")
 
     def save_conversation(self):
         """Save the current conversation to a file."""
         if not self.conversation_history:
-            print("(;_;) No conversation to save.")
+            print("(;_;) 目前沒有可儲存的對話。")
             return
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -4358,9 +4358,9 @@ class HermesCLI:
                     "session_start": self.session_start.isoformat(),
                     "messages": self.conversation_history,
                 }, f, indent=2, ensure_ascii=False)
-            print(f"(^_^)v Conversation saved to: {filename}")
+            print(f"(^_^)v 對話已儲存到：{filename}")
         except Exception as e:
-            print(f"(x_x) Failed to save: {e}")
+            print(f"(x_x) 儲存失敗：{e}")
     
     def retry_last(self):
         """Retry the last user message by removing the last exchange and re-sending.
@@ -4370,7 +4370,7 @@ class HermesCLI:
         Returns the message to re-send, or None if there's nothing to retry.
         """
         if not self.conversation_history:
-            print("(._.) No messages to retry.")
+            print("(._.) 目前沒有可重試的訊息。")
             return None
         
         # Walk backwards to find the last user message
@@ -4381,7 +4381,7 @@ class HermesCLI:
                 break
         
         if last_user_idx is None:
-            print("(._.) No user message found to retry.")
+            print("(._.) 找不到可重試的使用者訊息。")
             return None
         
         # Extract the message text and remove everything from that point forward
@@ -4398,7 +4398,7 @@ class HermesCLI:
         onward (including assistant responses, tool calls, etc.).
         """
         if not self.conversation_history:
-            print("(._.) No messages to undo.")
+            print("(._.) 目前沒有可復原的訊息。")
             return
         
         # Walk backwards to find the last user message
@@ -4409,7 +4409,7 @@ class HermesCLI:
                 break
         
         if last_user_idx is None:
-            print("(._.) No user message found to undo.")
+            print("(._.) 找不到可復原的使用者訊息。")
             return
         
         # Count how many messages we're removing
@@ -4534,18 +4534,18 @@ class HermesCLI:
         )
 
         provider_label = result.provider_label or result.target_provider
-        _cprint(f"  ✓ Model switched: {result.new_model}")
-        _cprint(f"    Provider: {provider_label}")
+        _cprint(f"  ✓ 已切換模型：{result.new_model}")
+        _cprint(f"    Provider：{provider_label}")
 
         mi = result.model_info
         if mi:
             if mi.context_window:
-                _cprint(f"    Context: {mi.context_window:,} tokens")
+                _cprint(f"    上下文：{mi.context_window:,} tokens")
             if mi.max_output:
-                _cprint(f"    Max output: {mi.max_output:,} tokens")
+                _cprint(f"    最大輸出：{mi.max_output:,} tokens")
             if mi.has_cost_data():
-                _cprint(f"    Cost: {mi.format_cost()}")
-            _cprint(f"    Capabilities: {mi.format_capabilities()}")
+                _cprint(f"    成本：{mi.format_cost()}")
+            _cprint(f"    能力：{mi.format_capabilities()}")
         else:
             try:
                 from agent.model_metadata import get_model_context_length
@@ -4555,7 +4555,7 @@ class HermesCLI:
                     api_key=result.api_key or self.api_key,
                     provider=result.target_provider,
                 )
-                _cprint(f"    Context: {ctx:,} tokens")
+                _cprint(f"    上下文：{ctx:,} tokens")
             except Exception:
                 pass
 
@@ -4564,16 +4564,16 @@ class HermesCLI:
             or result.api_mode == "anthropic_messages"
         )
         if cache_enabled:
-            _cprint("    Prompt caching: enabled")
+            _cprint("    Prompt caching：已啟用")
         if result.warning_message:
             _cprint(f"    ⚠ {result.warning_message}")
         if persist_global:
             save_config_value("model.default", result.new_model)
             if result.provider_changed:
                 save_config_value("model.provider", result.target_provider)
-            _cprint("    Saved to config.yaml (--global)")
+            _cprint("    已儲存到 config.yaml（--global）")
         else:
-            _cprint("    (session only — add --global to persist)")
+            _cprint("    （僅此 session；加上 --global 可持久保存）")
 
     def _handle_model_picker_selection(self, persist_global: bool = False) -> None:
         state = self._model_picker_state
@@ -4756,8 +4756,8 @@ class HermesCLI:
 
         # Display confirmation with full metadata
         provider_label = result.provider_label or result.target_provider
-        _cprint(f"  ✓ Model switched: {result.new_model}")
-        _cprint(f"    Provider: {provider_label}")
+        _cprint(f"  ✓ 已切換模型：{result.new_model}")
+        _cprint(f"    Provider：{provider_label}")
 
         # Rich metadata from models.dev
         mi = result.model_info
@@ -4789,7 +4789,7 @@ class HermesCLI:
             or result.api_mode == "anthropic_messages"
         )
         if cache_enabled:
-            _cprint("    Prompt caching: enabled")
+            _cprint("    Prompt caching：已啟用")
 
         # Warning from validation
         if result.warning_message:
@@ -4800,9 +4800,9 @@ class HermesCLI:
             save_config_value("model.default", result.new_model)
             if result.provider_changed:
                 save_config_value("model.provider", result.target_provider)
-            _cprint("    Saved to config.yaml (--global)")
+            _cprint("    已儲存到 config.yaml（--global）")
         else:
-            _cprint("    (session only — add --global to persist)")
+            _cprint("    （僅此 session；加上 --global 可持久保存）")
 
     def _should_handle_model_command_inline(self, text: str, has_images: bool = False) -> bool:
         """Return True when /model should be handled immediately on the UI thread."""
@@ -4929,16 +4929,16 @@ class HermesCLI:
                     print(f"(^_^) Personality set to '{personality_name}' (session only)")
                 print(f"  \"{self.system_prompt[:60]}{'...' if len(self.system_prompt) > 60 else ''}\"")
             else:
-                print(f"(._.) Unknown personality: {personality_name}")
-                print(f"  Available: none, {', '.join(self.personalities.keys())}")
+                print(f"(._.) 未知的人格模式：{personality_name}")
+                print(f"  可用項目：none, {', '.join(self.personalities.keys())}")
         else:
             # Show available personalities
             print()
             print("+" + "-" * 50 + "+")
-            print("|" + " " * 12 + "(^o^)/ Personalities" + " " * 15 + "|")
+            print("|" + " " * 15 + "(^o^)/ 人格模式" + " " * 16 + "|")
             print("+" + "-" * 50 + "+")
             print()
-            print(f"  {'none':<12} - (no personality overlay)")
+            print(f"  {'none':<12} - （不套用人格覆蓋）")
             for name, prompt in self.personalities.items():
                 if isinstance(prompt, dict):
                     preview = prompt.get("description") or prompt.get("system_prompt", "")[:50]
@@ -4946,7 +4946,7 @@ class HermesCLI:
                     preview = str(prompt)[:50]
                 print(f"  {name:<12} - {preview}")
             print()
-            print("  Usage: /personality <name>")
+            print("  用法：/personality <name>")
             print()
     
     def _handle_cron_command(self, cmd: str):
@@ -5092,13 +5092,13 @@ class HermesCLI:
         if subcommand in {"add", "create"}:
             positionals = opts["positionals"]
             if not positionals:
-                print("(._.) Usage: /cron add <schedule> <prompt>")
+                print("(._.) 用法：/cron add <schedule> <prompt>")
                 return
             schedule = opts["schedule"] or positionals[0]
             prompt = opts["prompt"] or " ".join(positionals[1:])
             skills = _normalize_skills(opts["skills"])
             if not prompt and not skills:
-                print("(._.) Please provide a prompt or at least one skill")
+                print("(._.) 請提供 prompt，或至少指定一個 skill")
                 return
             result = _cron_api(
                 action="create",
@@ -5110,24 +5110,24 @@ class HermesCLI:
                 skills=skills or None,
             )
             if result.get("success"):
-                print(f"(^_^)b Created job: {result['job_id']}")
-                print(f"  Schedule: {result['schedule']}")
+                print(f"(^_^)b 已建立 job：{result['job_id']}")
+                print(f"  排程：{result['schedule']}")
                 if result.get("skills"):
-                    print(f"  Skills: {', '.join(result['skills'])}")
-                print(f"  Next run: {result['next_run_at']}")
+                    print(f"  Skills：{', '.join(result['skills'])}")
+                print(f"  下次執行：{result['next_run_at']}")
             else:
-                print(f"(x_x) Failed to create job: {result.get('error')}")
+                print(f"(x_x) 建立 job 失敗：{result.get('error')}")
             return
 
         if subcommand == "edit":
             positionals = opts["positionals"]
             if not positionals:
-                print("(._.) Usage: /cron edit <job_id> [--schedule ...] [--prompt ...] [--skill ...]")
+                print("(._.) 用法：/cron edit <job_id> [--schedule ...] [--prompt ...] [--skill ...]")
                 return
             job_id = positionals[0]
             existing = get_job(job_id)
             if not existing:
-                print(f"(._.) Job not found: {job_id}")
+                print(f"(._.) 找不到 job：{job_id}")
                 return
 
             final_skills = None
@@ -5157,42 +5157,42 @@ class HermesCLI:
             )
             if result.get("success"):
                 job = result["job"]
-                print(f"(^_^)b Updated job: {job['job_id']}")
-                print(f"  Schedule: {job['schedule']}")
+                print(f"(^_^)b 已更新 job：{job['job_id']}")
+                print(f"  排程：{job['schedule']}")
                 if job.get("skills"):
-                    print(f"  Skills: {', '.join(job['skills'])}")
+                    print(f"  Skills：{', '.join(job['skills'])}")
                 else:
-                    print("  Skills: none")
+                    print("  Skills：none")
             else:
-                print(f"(x_x) Failed to update job: {result.get('error')}")
+                print(f"(x_x) 更新 job 失敗：{result.get('error')}")
             return
 
         if subcommand in {"pause", "resume", "run", "remove", "rm", "delete"}:
             positionals = opts["positionals"]
             if not positionals:
-                print(f"(._.) Usage: /cron {subcommand} <job_id>")
+                print(f"(._.) 用法：/cron {subcommand} <job_id>")
                 return
             job_id = positionals[0]
             action = "remove" if subcommand in {"remove", "rm", "delete"} else subcommand
             result = _cron_api(action=action, job_id=job_id, reason="paused from /cron" if action == "pause" else None)
             if not result.get("success"):
-                print(f"(x_x) Failed to {action} job: {result.get('error')}")
+                print(f"(x_x) {action} job 失敗：{result.get('error')}")
                 return
             if action == "pause":
-                print(f"(^_^)b Paused job: {result['job']['name']} ({job_id})")
+                print(f"(^_^)b 已暫停 job：{result['job']['name']} ({job_id})")
             elif action == "resume":
-                print(f"(^_^)b Resumed job: {result['job']['name']} ({job_id})")
-                print(f"  Next run: {result['job'].get('next_run_at')}")
+                print(f"(^_^)b 已恢復 job：{result['job']['name']} ({job_id})")
+                print(f"  下次執行：{result['job'].get('next_run_at')}")
             elif action == "run":
-                print(f"(^_^)b Triggered job: {result['job']['name']} ({job_id})")
-                print("  It will run on the next scheduler tick.")
+                print(f"(^_^)b 已觸發 job：{result['job']['name']} ({job_id})")
+                print("  它會在下一次 scheduler tick 執行。")
             else:
                 removed = result.get("removed_job", {})
-                print(f"(^_^)b Removed job: {removed.get('name', job_id)} ({job_id})")
+                print(f"(^_^)b 已移除 job：{removed.get('name', job_id)} ({job_id})")
             return
 
-        print(f"(._.) Unknown cron command: {subcommand}")
-        print("  Available: list, add, edit, pause, resume, run, remove")
+        print(f"(._.) 未知的 cron 指令：{subcommand}")
+        print("  可用項目：list, add, edit, pause, resume, run, remove")
     
     def _handle_skills_command(self, cmd: str):
         """Handle /skills slash command — delegates to hermes_cli.skills_hub."""
@@ -5391,7 +5391,7 @@ class HermesCLI:
                     else:
                         _cprint("  Session database not available.")
                 else:
-                    _cprint("  Usage: /title <your session title>")
+                    _cprint("  用法：/title <你的 session 標題>")
             else:
                 # Show current title and session ID if no argument given
                 if self._session_db:
@@ -5402,7 +5402,7 @@ class HermesCLI:
                     elif self._pending_title:
                         _cprint(f"  Title (pending): {self._pending_title}")
                     else:
-                        _cprint("  No title set. Usage: /title <your session title>")
+                        _cprint("  尚未設定標題。用法：/title <你的 session 標題>")
                 else:
                     _cprint("  Session database not available.")
         elif canonical == "new":
@@ -5508,13 +5508,13 @@ class HermesCLI:
             parts = cmd_original.split(None, 1)
             payload = parts[1].strip() if len(parts) > 1 else ""
             if not payload:
-                _cprint("  Usage: /queue <prompt>")
+                _cprint("  用法：/queue <prompt>")
             else:
                 self._pending_input.put(payload)
                 if self._agent_running:
-                    _cprint(f"  Queued for the next turn: {payload[:80]}{'...' if len(payload) > 80 else ''}")
+                    _cprint(f"  已排入下一輪：{payload[:80]}{'...' if len(payload) > 80 else ''}")
                 else:
-                    _cprint(f"  Queued: {payload[:80]}{'...' if len(payload) > 80 else ''}")
+                    _cprint(f"  已排入佇列：{payload[:80]}{'...' if len(payload) > 80 else ''}")
         elif canonical == "skin":
             self._handle_skin_command(cmd_original)
         elif canonical == "voice":
@@ -5659,9 +5659,9 @@ class HermesCLI:
         """
         parts = cmd.strip().split(maxsplit=1)
         if len(parts) < 2 or not parts[1].strip():
-            _cprint("  Usage: /background <prompt>")
-            _cprint("  Example: /background Summarize the top HN stories today")
-            _cprint("  The task runs in a separate session and results display here when done.")
+            _cprint("  用法：/background <prompt>")
+            _cprint("  例如：/background 摘要今天 HN 的熱門故事")
+            _cprint("  任務會在獨立 session 執行，完成後結果會顯示在這裡。")
             return
 
         prompt = parts[1].strip()
@@ -5800,9 +5800,9 @@ class HermesCLI:
         """
         parts = cmd.strip().split(maxsplit=1)
         if len(parts) < 2 or not parts[1].strip():
-            _cprint("  Usage: /btw <question>")
-            _cprint("  Example: /btw what module owns session title sanitization?")
-            _cprint("  Answers using session context. No tools, not persisted.")
+            _cprint("  用法：/btw <question>")
+            _cprint("  例如：/btw 哪個模組負責 session title sanitization？")
+            _cprint("  會使用目前 session 上下文回答。不用工具，也不會持久化。")
             return
 
         question = parts[1].strip()
@@ -6120,11 +6120,11 @@ class HermesCLI:
 
         else:
             print()
-            print("Usage: /browser connect|disconnect|status")
+            print("用法：/browser connect|disconnect|status")
             print()
-            print("   connect      Connect browser tools to your live Chrome session")
-            print("   disconnect   Revert to default browser backend")
-            print("   status       Show current browser mode")
+            print("   connect      將 browser 工具連到你目前的 Chrome session")
+            print("   disconnect   切回預設 browser backend")
+            print("   status       顯示目前 browser 模式")
             print()
 
     def _handle_skin_command(self, cmd: str):
@@ -6140,21 +6140,21 @@ class HermesCLI:
             # Show current skin and list available
             current = get_active_skin_name()
             skins = list_skins()
-            print(f"\n  Current skin: {current}")
-            print("  Available skins:")
+            print(f"\n  目前 skin：{current}")
+            print("  可用 skins：")
             for s in skins:
                 marker = " ●" if s["name"] == current else "  "
                 source = f" ({s['source']})" if s["source"] == "user" else ""
                 print(f"   {marker} {s['name']}{source} — {s['description']}")
-            print("\n  Usage: /skin <name>")
-            print(f"  Custom skins: drop a YAML file in {display_hermes_home()}/skins/\n")
+            print("\n  用法：/skin <name>")
+            print(f"  自訂 skins：把 YAML 檔放進 {display_hermes_home()}/skins/\n")
             return
 
         new_skin = parts[1].strip().lower()
         available = {s["name"] for s in list_skins()}
         if new_skin not in available:
-            print(f"  Unknown skin: {new_skin}")
-            print(f"  Available: {', '.join(sorted(available))}")
+            print(f"  未知的 skin：{new_skin}")
+            print(f"  可用項目：{', '.join(sorted(available))}")
             return
 
         set_active_skin(new_skin)
@@ -6222,15 +6222,15 @@ class HermesCLI:
             # Show current state
             rc = self.reasoning_config
             if rc is None:
-                level = "medium (default)"
+                level = "medium（預設）"
             elif rc.get("enabled") is False:
-                level = "none (disabled)"
+                level = "none（已停用）"
             else:
                 level = rc.get("effort", "medium")
             display_state = "on ✓" if self.show_reasoning else "off"
-            _cprint(f"  {_ACCENT}Reasoning effort:  {level}{_RST}")
-            _cprint(f"  {_ACCENT}Reasoning display: {display_state}{_RST}")
-            _cprint(f"  {_DIM}Usage: /reasoning <none|minimal|low|medium|high|xhigh|show|hide>{_RST}")
+            _cprint(f"  {_ACCENT}Reasoning 強度：{level}{_RST}")
+            _cprint(f"  {_ACCENT}Reasoning 顯示：{display_state}{_RST}")
+            _cprint(f"  {_DIM}用法：/reasoning <none|minimal|low|medium|high|xhigh|show|hide>{_RST}")
             return
 
         arg = parts[1].strip().lower()
@@ -6241,37 +6241,37 @@ class HermesCLI:
             if self.agent:
                 self.agent.reasoning_callback = self._current_reasoning_callback()
             save_config_value("display.show_reasoning", True)
-            _cprint(f"  {_ACCENT}✓ Reasoning display: ON (saved){_RST}")
-            _cprint(f"  {_DIM}  Model thinking will be shown during and after each response.{_RST}")
+            _cprint(f"  {_ACCENT}✓ Reasoning 顯示：開啟（已儲存）{_RST}")
+            _cprint(f"  {_DIM}  每次回覆的模型思考過程會在過程中與結束後顯示。{_RST}")
             return
         if arg in ("hide", "off"):
             self.show_reasoning = False
             if self.agent:
                 self.agent.reasoning_callback = self._current_reasoning_callback()
             save_config_value("display.show_reasoning", False)
-            _cprint(f"  {_ACCENT}✓ Reasoning display: OFF (saved){_RST}")
+            _cprint(f"  {_ACCENT}✓ Reasoning 顯示：關閉（已儲存）{_RST}")
             return
 
         # Effort level change
         parsed = _parse_reasoning_config(arg)
         if parsed is None:
-            _cprint(f"  {_DIM}(._.) Unknown argument: {arg}{_RST}")
-            _cprint(f"  {_DIM}Valid levels: none, minimal, low, medium, high, xhigh{_RST}")
-            _cprint(f"  {_DIM}Display:      show, hide{_RST}")
+            _cprint(f"  {_DIM}(._.) 未知參數：{arg}{_RST}")
+            _cprint(f"  {_DIM}可用強度：none, minimal, low, medium, high, xhigh{_RST}")
+            _cprint(f"  {_DIM}顯示控制：show, hide{_RST}")
             return
 
         self.reasoning_config = parsed
         self.agent = None  # Force agent re-init with new reasoning config
 
         if save_config_value("agent.reasoning_effort", arg):
-            _cprint(f"  {_ACCENT}✓ Reasoning effort set to '{arg}' (saved to config){_RST}")
+            _cprint(f"  {_ACCENT}✓ 已將 Reasoning 強度設為「{arg}」（已儲存到設定）{_RST}")
         else:
-            _cprint(f"  {_ACCENT}✓ Reasoning effort set to '{arg}' (session only){_RST}")
+            _cprint(f"  {_ACCENT}✓ 已將 Reasoning 強度設為「{arg}」（僅此 session）{_RST}")
 
     def _handle_fast_command(self, cmd: str):
         """Handle /fast — toggle fast mode (OpenAI Priority Processing / Anthropic Fast Mode)."""
         if not self._fast_command_available():
-            _cprint("  (._.) /fast is only available for models that support fast mode (OpenAI Priority Processing or Anthropic Fast Mode).")
+            _cprint("  (._.) /fast 只適用於支援 fast mode 的模型（OpenAI Priority Processing 或 Anthropic Fast Mode）。")
             return
 
         # Determine the branding for the current model
@@ -6287,7 +6287,7 @@ class HermesCLI:
         if len(parts) < 2 or parts[1].strip().lower() == "status":
             status = "fast" if self.service_tier == "priority" else "normal"
             _cprint(f"  {_ACCENT}{feature_name}: {status}{_RST}")
-            _cprint(f"  {_DIM}Usage: /fast [normal|fast|status]{_RST}")
+            _cprint(f"  {_DIM}用法：/fast [normal|fast|status]{_RST}")
             return
 
         arg = parts[1].strip().lower()
@@ -6301,15 +6301,15 @@ class HermesCLI:
             saved_value = "normal"
             label = "NORMAL"
         else:
-            _cprint(f"  {_DIM}(._.) Unknown argument: {arg}{_RST}")
-            _cprint(f"  {_DIM}Usage: /fast [normal|fast|status]{_RST}")
+            _cprint(f"  {_DIM}(._.) 未知參數：{arg}{_RST}")
+            _cprint(f"  {_DIM}用法：/fast [normal|fast|status]{_RST}")
             return
 
         self.agent = None  # Force agent re-init with new service-tier config
         if save_config_value("agent.service_tier", saved_value):
-            _cprint(f"  {_ACCENT}✓ {feature_name} set to {label} (saved to config){_RST}")
+            _cprint(f"  {_ACCENT}✓ 已將 {feature_name} 設為 {label}（已儲存到設定）{_RST}")
         else:
-            _cprint(f"  {_ACCENT}✓ {feature_name} set to {label} (session only){_RST}")
+            _cprint(f"  {_ACCENT}✓ 已將 {feature_name} 設為 {label}（僅此 session）{_RST}")
 
     def _on_reasoning(self, reasoning_text: str):
         """Callback for intermediate reasoning display during tool-call loops."""
@@ -6327,15 +6327,15 @@ class HermesCLI:
         Claude Code's ``/compact <focus>`` feature.
         """
         if not self.conversation_history or len(self.conversation_history) < 4:
-            print("(._.) Not enough conversation to compress (need at least 4 messages).")
+            print("(._.) 對話內容不足，無法壓縮（至少需要 4 則訊息）。")
             return
 
         if not self.agent:
-            print("(._.) No active agent -- send a message first.")
+            print("(._.) 目前沒有啟用中的 agent——請先送出一則訊息。")
             return
 
         if not self.agent.compression_enabled:
-            print("(._.) Compression is disabled in config.")
+            print("(._.) 設定中已停用 compression。")
             return
 
         # Extract optional focus topic from the command (e.g. "/compress database schema")
@@ -7051,8 +7051,8 @@ class HermesCLI:
             else:
                 self._enable_voice_mode()
         else:
-            _cprint(f"Unknown voice subcommand: {subcommand}")
-            _cprint("Usage: /voice [on|off|tts|status]")
+            _cprint(f"未知的 voice 子指令：{subcommand}")
+            _cprint("用法：/voice [on|off|tts|status]")
 
     def _enable_voice_mode(self):
         """Enable voice mode after checking requirements."""

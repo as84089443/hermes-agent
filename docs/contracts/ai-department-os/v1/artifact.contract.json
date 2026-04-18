@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ai-department-os/v1/artifact.contract.json",
+  "title": "AI Department OS v1 Artifact Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "project_id",
+    "type",
+    "version",
+    "status",
+    "path",
+    "produced_by_task_id",
+    "supersedes_artifact_id",
+    "checksum",
+    "created_at",
+    "immutable_ref",
+    "is_latest_version"
+  ],
+  "properties": {
+    "id": { "type": "string", "x-storage": "persisted" },
+    "project_id": { "type": "string", "x-storage": "persisted" },
+    "type": {
+      "type": "string",
+      "enum": ["brief", "research_memo", "strategy_memo", "script", "storyboard", "prompt_pack", "asset_checklist", "edit_plan", "qa_report", "publish_pack", "retro"],
+      "x-storage": "persisted"
+    },
+    "version": { "type": "integer", "minimum": 1, "x-storage": "persisted" },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "final", "superseded"],
+      "x-storage": "persisted"
+    },
+    "path": { "type": "string", "minLength": 1, "x-storage": "persisted" },
+    "produced_by_task_id": { "type": "string", "x-storage": "persisted" },
+    "supersedes_artifact_id": { "type": ["string", "null"], "x-storage": "persisted" },
+    "checksum": { "type": ["string", "null"], "x-storage": "persisted" },
+    "created_at": { "type": "string", "format": "date-time", "x-storage": "persisted" },
+    "immutable_ref": { "type": "string", "readOnly": true, "x-storage": "derived" },
+    "is_latest_version": { "type": "boolean", "readOnly": true, "x-storage": "derived" }
+  }
+}

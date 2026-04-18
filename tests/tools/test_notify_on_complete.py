@@ -202,7 +202,7 @@ class TestCheckpointNotify:
             data = json.loads((tmp_path / "procs.json").read_text())
             assert data[0]["notify_on_complete"] is False
 
-    def test_recover_preserves_notify(self, registry, tmp_path):
+    def test_recover_disables_notify_for_detached_processes(self, registry, tmp_path):
         checkpoint = tmp_path / "procs.json"
         checkpoint.write_text(json.dumps([{
             "session_id": "proc_live",
@@ -215,9 +215,9 @@ class TestCheckpointNotify:
             recovered = registry.recover_from_checkpoint()
             assert recovered == 1
             s = registry.get("proc_live")
-            assert s.notify_on_complete is True
+            assert s.notify_on_complete is False
 
-    def test_recover_requeues_notify_watchers(self, registry, tmp_path):
+    def test_recover_does_not_requeue_notify_watchers(self, registry, tmp_path):
         checkpoint = tmp_path / "procs.json"
         checkpoint.write_text(json.dumps([{
             "session_id": "proc_live",
@@ -236,10 +236,14 @@ class TestCheckpointNotify:
         with patch("tools.process_registry.CHECKPOINT_PATH", checkpoint):
             recovered = registry.recover_from_checkpoint()
             assert recovered == 1
-            assert len(registry.pending_watchers) == 1
-            assert registry.pending_watchers[0]["notify_on_complete"] is True
-            assert registry.pending_watchers[0]["user_id"] == "u123"
-            assert registry.pending_watchers[0]["user_name"] == "alice"
+            assert len(registry.pending_watchers) == 0
+
+            session = registry.get("proc_live")
+            assert session is not None
+            assert session.notify_on_complete is False
+            assert session.watcher_interval == 0
+            assert session.watcher_platform == ""
+            assert session.watcher_chat_id == ""
 
     def test_recover_defaults_false(self, registry, tmp_path):
         """Old checkpoint entries without the field default to False."""

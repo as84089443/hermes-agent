@@ -613,6 +613,29 @@ async def test_run_agent_interim_commentary_works_with_tool_progress_off(monkeyp
 
 
 @pytest.mark.asyncio
+async def test_run_agent_suppresses_interim_commentary_for_slack_platform_override(monkeypatch, tmp_path):
+    adapter, result = await _run_with_agent(
+        monkeypatch,
+        tmp_path,
+        CommentaryAgent,
+        session_id="sess-commentary-slack-platform-disabled",
+        config_data={
+            "display": {
+                "interim_assistant_messages": True,
+                "platforms": {"slack": {"interim_assistant_messages": False, "tool_progress": "off"}},
+            }
+        },
+        platform=Platform.SLACK,
+        chat_id="C123",
+        chat_type="group",
+        thread_id="1712345678.000100",
+    )
+
+    assert result.get("already_sent") is not True
+    assert not any(call["content"] == "I'll inspect the repo first." for call in adapter.sent)
+
+
+@pytest.mark.asyncio
 async def test_run_agent_previewed_final_marks_already_sent(monkeypatch, tmp_path):
     adapter, result = await _run_with_agent(
         monkeypatch,
