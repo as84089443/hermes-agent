@@ -418,18 +418,12 @@ export default function AgentsPage() {
           <Button variant="outline" onClick={refresh} className="gap-2">
             <RefreshCw className="h-4 w-4" /> 刷新
           </Button>
-          <div className="text-right">
-            <div className="flex items-center justify-end gap-2 text-4xl font-bold">
-              {sc.score}
-              <span className="text-xl text-muted-foreground">/ {sc.max}</span>
-            </div>
-            <div className="mt-1 flex items-center justify-end gap-1 text-xs text-muted-foreground">
-              {trendIcon}
-              <span className="truncate max-w-md">{sc.trend}</span>
-            </div>
-          </div>
+          <ScoreRing score={sc.score} max={sc.max} trend={sc.trend} trendIcon={trendIcon} />
         </div>
       </div>
+
+      {/* -------- 6-signal strip (at-a-glance health) -------- */}
+      <SignalStrip breakdown={sc.breakdown} />
 
       {/* -------- Toast -------- */}
       {toast && (
@@ -461,7 +455,7 @@ export default function AgentsPage() {
         />
       )}
 
-      {/* -------- Scorecard breakdown -------- */}
+      {/* -------- Scorecard breakdown (visual tiles) -------- */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -470,21 +464,9 @@ export default function AgentsPage() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {Object.entries(sc.breakdown).map(([name, tuple]) => {
-              const [emoji, reason] = tuple;
-              return (
-                <div
-                  key={name}
-                  className="flex items-start gap-3 rounded-md border border-border/60 bg-card/50 p-3"
-                >
-                  <div className="text-xl">{emoji}</div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium">{name}</div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">{reason}</div>
-                  </div>
-                </div>
-              );
-            })}
+            {Object.entries(sc.breakdown).map(([name, tuple]) => (
+              <ScoreTile key={name} name={name} emoji={tuple[0]} reason={tuple[1]} />
+            ))}
           </div>
         </CardContent>
       </Card>
@@ -558,7 +540,8 @@ export default function AgentsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+            <MiddlewareFlow entries={middleware.entries} />
+            <div className="mt-4 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
               {middleware.entries.map((e) => (
                 <div
                   key={e.name}
@@ -882,6 +865,7 @@ export default function AgentsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <BusPipeline tasks={bus} />
           {busOpen.length > 0 && (
             <div>
               <div className="mb-2 text-sm font-medium">進行中 ({busOpen.length})</div>
@@ -1079,9 +1063,252 @@ export default function AgentsPage() {
   );
 }
 
+// -------- ScoreRing --------
+function ScoreRing({
+  score,
+  max,
+  trend,
+  trendIcon,
+}: {
+  score: number;
+  max: number;
+  trend: string;
+  trendIcon: React.ReactNode;
+}) {
+  const r = 36;
+  const c = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(1, score / max));
+  const dash = c * pct;
+  // Color by score band: 0-4 red, 5-7 amber, 8+ emerald
+  const stroke =
+    score >= 8 ? "#22c55e" : score >= 5 ? "#eab308" : "#ef4444";
+
+  return (
+    <div className="flex items-center gap-3">
+      <svg width="96" height="96" viewBox="0 0 96 96">
+        <circle
+          cx="48"
+          cy="48"
+          r={r}
+          fill="none"
+          stroke="currentColor"
+          strokeOpacity="0.12"
+          strokeWidth="8"
+        />
+        <circle
+          cx="48"
+          cy="48"
+          r={r}
+          fill="none"
+          stroke={stroke}
+          strokeWidth="8"
+          strokeLinecap="round"
+          strokeDasharray={`${dash} ${c - dash}`}
+          transform="rotate(-90 48 48)"
+          className="transition-all duration-500"
+        />
+        <text
+          x="48"
+          y="50"
+          textAnchor="middle"
+          dominantBaseline="central"
+          className="font-bold"
+          fontSize="24"
+          fill="currentColor"
+        >
+          {score}
+        </text>
+        <text
+          x="48"
+          y="68"
+          textAnchor="middle"
+          fontSize="9"
+          fill="currentColor"
+          fillOpacity="0.5"
+        >
+          / {max}
+        </text>
+      </svg>
+      <div className="text-right max-w-[12rem]">
+        <div className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
+          {trendIcon}
+        </div>
+        <div className="mt-1 text-xs text-muted-foreground line-clamp-2">
+          {trend}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// -------- SignalStrip --------
+function SignalStrip({ breakdown }: { breakdown: Record<string, [string, string]> }) {
+  const COLORS: Record<string, string> = {
+    "🟢": "#22c55e",
+    "🟡": "#eab308",
+    "🔴": "#ef4444",
+  };
+  return (
+    <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+      {Object.entries(breakdown).map(([name, tuple]) => {
+        const [emoji, reason] = tuple;
+        const color = COLORS[emoji] || "#737373";
+        return (
+          <div
+            key={name}
+            className="rounded-md border border-border/60 bg-card/50 p-2"
+            title={`${name}\n${reason}`}
+          >
+            <div
+              className="h-1 rounded-full mb-1.5"
+              style={{ backgroundColor: color }}
+            />
+            <div className="text-[0.7rem] font-medium truncate">{name}</div>
+            <div className="text-[0.65rem] text-muted-foreground truncate">
+              {reason}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// -------- ScoreTile (for breakdown grid) --------
+function ScoreTile({
+  name,
+  emoji,
+  reason,
+}: {
+  name: string;
+  emoji: string;
+  reason: string;
+}) {
+  const tone =
+    emoji === "🟢"
+      ? "border-green-500/40 bg-green-500/5"
+      : emoji === "🟡"
+      ? "border-yellow-500/40 bg-yellow-500/5"
+      : emoji === "🔴"
+      ? "border-red-500/40 bg-red-500/5"
+      : "border-border/60 bg-card/50";
+  return (
+    <div
+      className={`flex items-start gap-3 rounded-md border p-3 transition-colors ${tone}`}
+    >
+      <div className="text-2xl">{emoji}</div>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium">{name}</div>
+        <div className="mt-0.5 text-xs text-muted-foreground">{reason}</div>
+      </div>
+    </div>
+  );
+}
+
+// -------- MiddlewareFlow (horizontal pipeline diagram) --------
+function MiddlewareFlow({ entries }: { entries: MiddlewareEntry[] }) {
+  if (entries.length === 0) return null;
+  // Sort by order, color by enabled state
+  const sorted = [...entries].sort((a, b) => a.order - b.order);
+  return (
+    <div className="overflow-x-auto -mx-2 px-2 pb-1">
+      <div className="flex items-center gap-1 min-w-max">
+        {sorted.map((e, i) => {
+          const fill = e.enabled
+            ? e.critical
+              ? "bg-red-500/20 border-red-500/60 text-red-500"
+              : "bg-green-500/15 border-green-500/50 text-green-600"
+            : "bg-muted/40 border-border/60 text-muted-foreground line-through";
+          return (
+            <div key={e.name} className="flex items-center">
+              <div
+                className={`relative rounded-md border ${fill} px-2.5 py-1.5 text-xs whitespace-nowrap`}
+                title={`order ${e.order} · env ${e.env_var || "(none)"} · ${
+                  e.enabled ? "enabled" : "disabled"
+                }`}
+              >
+                <span className="absolute -top-1.5 left-1.5 px-1 text-[0.6rem] bg-background border border-border/60 rounded font-mono">
+                  {e.order}
+                </span>
+                <span className="font-mono">{e.name}</span>
+              </div>
+              {i < sorted.length - 1 && (
+                <span className="text-muted-foreground/40 px-1">→</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// -------- BusPipeline (lifecycle stages with counts) --------
+function BusPipeline({ tasks }: { tasks: BusTask[] }) {
+  const STAGES: Array<{ id: string; label: string; statuses: string[] }> = [
+    { id: "pending", label: "pending", statuses: ["pending"] },
+    { id: "ack", label: "ack", statuses: ["ack"] },
+    { id: "progress", label: "progress / keep-alive", statuses: ["progress", "keep-alive"] },
+    { id: "done", label: "done", statuses: ["done"] },
+    { id: "fail", label: "fail / timeout", statuses: ["fail", "timeout"] },
+  ];
+  const counts = STAGES.map((s) => ({
+    ...s,
+    count: tasks.filter((t) => s.statuses.includes(t.status)).length,
+  }));
+  const max = Math.max(...counts.map((c) => c.count), 1);
+
+  return (
+    <div className="rounded-md border border-border/60 bg-card/30 p-3">
+      <div className="text-xs text-muted-foreground mb-2">Lifecycle pipeline (recent 30)</div>
+      <div className="flex items-stretch gap-2">
+        {counts.map((s, i) => {
+          const intensity = (s.count / max) * 0.8 + 0.2;
+          const fill =
+            s.id === "done"
+              ? `rgba(34, 197, 94, ${intensity})`
+              : s.id === "fail"
+              ? `rgba(239, 68, 68, ${intensity})`
+              : s.id === "progress"
+              ? `rgba(59, 130, 246, ${intensity})`
+              : s.id === "ack"
+              ? `rgba(234, 179, 8, ${intensity})`
+              : `rgba(115, 115, 115, ${intensity})`;
+          return (
+            <div key={s.id} className="flex items-center flex-1">
+              <div className="flex-1 rounded-md border border-border/60 px-3 py-2 text-center">
+                <div
+                  className="rounded text-white font-bold py-2 text-lg"
+                  style={{ backgroundColor: fill }}
+                >
+                  {s.count}
+                </div>
+                <div className="mt-1 text-[0.7rem] text-muted-foreground font-mono">
+                  {s.label}
+                </div>
+              </div>
+              {i < counts.length - 1 && (
+                <span className="text-muted-foreground/40 px-1">→</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // -------- Trace Timeline --------
 function TraceTimeline({ spans }: { spans: TraceSpan[] }) {
   if (spans.length === 0) return null;
+
+  const HOOK_COLORS: Record<string, string> = {
+    before_model: "#3b82f6",
+    after_model: "#8b5cf6",
+    before_tool: "#f59e0b",
+    after_tool: "#10b981",
+    on_session_end: "#ef4444",
+  };
 
   const byHook: Record<string, { count: number; total_ms: number; max_ms: number }> = {};
   for (const s of spans) {
@@ -1093,48 +1320,74 @@ function TraceTimeline({ spans }: { spans: TraceSpan[] }) {
   }
 
   const overallMax = Math.max(...spans.map((s) => s.duration_ms), 1);
+  const totalCalls = spans.length;
+  const totalTime = spans.reduce((acc, s) => acc + s.duration_ms, 0);
 
   return (
     <div className="space-y-4">
-      {/* Per-hook summary */}
-      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-5">
-        {Object.entries(byHook).map(([hook, stats]) => (
-          <div
-            key={hook}
-            className="rounded-md border border-border/60 bg-card/50 p-2 text-sm"
-          >
-            <div className="font-mono text-xs text-muted-foreground">{hook}</div>
-            <div className="mt-0.5 text-sm">
-              {stats.count}× · avg {(stats.total_ms / stats.count).toFixed(2)}ms
+      {/* Distribution bar — what % of time each hook took */}
+      <div>
+        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+          <span>Hook time distribution ({totalCalls} calls, {totalTime.toFixed(1)}ms total)</span>
+        </div>
+        <div className="flex h-6 rounded overflow-hidden border border-border/40">
+          {Object.entries(byHook).map(([hook, stats]) => {
+            const pct = (stats.total_ms / Math.max(totalTime, 0.01)) * 100;
+            const color = HOOK_COLORS[hook] || "#737373";
+            if (pct < 1) return null;
+            return (
+              <div
+                key={hook}
+                style={{ width: `${pct}%`, backgroundColor: color }}
+                className="flex items-center justify-center text-[0.65rem] text-white font-mono"
+                title={`${hook}: ${stats.total_ms.toFixed(2)}ms (${pct.toFixed(1)}%)`}
+              >
+                {pct > 5 ? hook.replace("_", " ") : ""}
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-1 flex flex-wrap gap-2 text-[0.65rem]">
+          {Object.entries(byHook).map(([hook, stats]) => (
+            <div key={hook} className="flex items-center gap-1">
+              <span
+                className="inline-block w-2 h-2 rounded-sm"
+                style={{ backgroundColor: HOOK_COLORS[hook] || "#737373" }}
+              />
+              <span className="font-mono">{hook}</span>
+              <span className="text-muted-foreground">
+                {stats.count}× avg {(stats.total_ms / stats.count).toFixed(1)}ms
+              </span>
             </div>
-            <div className="text-xs text-muted-foreground">
-              max {stats.max_ms.toFixed(2)}ms
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
-      {/* Recent 20 spans as bars */}
+      {/* Recent 20 spans as colored bars */}
       <div className="space-y-1">
         <div className="text-xs text-muted-foreground mb-1">最近 20 條 spans</div>
         {spans.slice(-20).reverse().map((s, i) => {
           const pct = Math.min(100, (s.duration_ms / overallMax) * 100);
+          const color = HOOK_COLORS[s.hook] || "#737373";
           return (
             <div key={i} className="flex items-center gap-2 text-xs">
-              <span className="w-24 shrink-0 font-mono text-muted-foreground truncate">
+              <span className="w-28 shrink-0 font-mono text-muted-foreground truncate">
                 {s.hook}
               </span>
-              <div className="flex-1 relative h-4 rounded bg-background/50 border border-border/40">
+              <div className="flex-1 relative h-5 rounded bg-background/50 border border-border/40">
                 <div
-                  className="absolute left-0 top-0 h-full bg-primary/40"
-                  style={{ width: `${pct}%` }}
+                  className="absolute left-0 top-0 h-full rounded-l opacity-70 transition-all"
+                  style={{ width: `${pct}%`, backgroundColor: color }}
                 />
-                <div className="absolute inset-0 flex items-center px-2 text-xs">
+                <div className="absolute inset-0 flex items-center px-2 text-[0.7rem] font-mono">
                   {s.duration_ms.toFixed(2)}ms
                 </div>
               </div>
-              <span className="w-28 shrink-0 truncate font-mono text-muted-foreground" title={s.thread_id || ""}>
-                {s.thread_id ? s.thread_id.slice(0, 14) : "-"}
+              <span
+                className="w-28 shrink-0 truncate font-mono text-muted-foreground"
+                title={s.thread_id || ""}
+              >
+                {s.thread_id ? s.thread_id.slice(0, 16) : "-"}
               </span>
             </div>
           );
@@ -1153,44 +1406,107 @@ function SnapshotSparkline({ snapshots }: { snapshots: Snapshot[] }) {
   if (dataPoints.length < 2) {
     return <div className="text-sm text-muted-foreground">需要至少 2 份快照才能畫趨勢</div>;
   }
-  const width = 600;
-  const height = 80;
+  const padL = 28;
+  const padR = 12;
+  const padT = 10;
+  const padB = 22;
+  const innerW = 600;
+  const innerH = 100;
+  const width = innerW + padL + padR;
+  const height = innerH + padT + padB;
   const max = 10;
   const min = 0;
-  const dx = width / (dataPoints.length - 1);
-  const points = dataPoints.map((p, i) => {
-    const x = i * dx;
-    const y = height - ((p.score - min) / (max - min)) * height;
-    return `${x},${y}`;
-  });
+  const dx = innerW / (dataPoints.length - 1);
+  const yFor = (s: number) =>
+    padT + innerH - ((s - min) / (max - min)) * innerH;
+  const xFor = (i: number) => padL + i * dx;
+  const points = dataPoints.map((p, i) => `${xFor(i)},${yFor(p.score)}`);
   const path = "M " + points.join(" L ");
+  const areaPath =
+    `M ${xFor(0)},${padT + innerH} L ` +
+    points.join(" L ") +
+    ` L ${xFor(dataPoints.length - 1)},${padT + innerH} Z`;
 
+  const gridLines = [0, 5, 10];
   return (
     <div className="w-full">
-      <svg viewBox={`0 0 ${width} ${height + 20}`} className="w-full h-24">
-        {/* gridline for 5/10 */}
-        <line
-          x1="0"
-          y1={height - (5 / 10) * height}
-          x2={width}
-          y2={height - (5 / 10) * height}
-          stroke="currentColor"
-          strokeOpacity="0.15"
-          strokeDasharray="4 4"
-        />
-        <path d={path} fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-        {dataPoints.map((p, i) => (
-          <circle
-            key={i}
-            cx={i * dx}
-            cy={height - ((p.score - min) / (max - min)) * height}
-            r="3"
-            fill="currentColor"
-          />
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-32">
+        {/* horizontal gridlines + y-axis labels */}
+        {gridLines.map((g) => (
+          <g key={g}>
+            <line
+              x1={padL}
+              y1={yFor(g)}
+              x2={padL + innerW}
+              y2={yFor(g)}
+              stroke="currentColor"
+              strokeOpacity="0.12"
+              strokeDasharray={g === 5 ? "3 3" : ""}
+            />
+            <text
+              x={padL - 4}
+              y={yFor(g) + 3}
+              textAnchor="end"
+              fontSize="9"
+              fill="currentColor"
+              fillOpacity="0.5"
+            >
+              {g}
+            </text>
+          </g>
         ))}
+        {/* area fill */}
+        <path d={areaPath} fill="currentColor" fillOpacity="0.08" />
+        {/* line */}
+        <path
+          d={path}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        {/* points colored by score band */}
+        {dataPoints.map((p, i) => {
+          const fill = p.score >= 8 ? "#22c55e" : p.score >= 5 ? "#eab308" : "#ef4444";
+          return (
+            <circle key={i} cx={xFor(i)} cy={yFor(p.score)} r="3.5" fill={fill}>
+              <title>{`${p.ts}: ${p.score}/10`}</title>
+            </circle>
+          );
+        })}
+        {/* x-axis baseline */}
+        <line
+          x1={padL}
+          y1={padT + innerH + 1}
+          x2={padL + innerW}
+          y2={padT + innerH + 1}
+          stroke="currentColor"
+          strokeOpacity="0.3"
+        />
+        <text
+          x={padL}
+          y={padT + innerH + 14}
+          fontSize="9"
+          fill="currentColor"
+          fillOpacity="0.5"
+        >
+          oldest
+        </text>
+        <text
+          x={padL + innerW}
+          y={padT + innerH + 14}
+          textAnchor="end"
+          fontSize="9"
+          fill="currentColor"
+          fillOpacity="0.5"
+        >
+          latest
+        </text>
       </svg>
       <div className="mt-1 flex justify-between text-xs text-muted-foreground font-mono">
         <span>最舊 {dataPoints[0].score}/10</span>
+        <span>{dataPoints.length} snapshots</span>
         <span>最新 {dataPoints[dataPoints.length - 1].score}/10</span>
       </div>
     </div>
