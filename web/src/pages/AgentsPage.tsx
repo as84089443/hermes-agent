@@ -222,6 +222,117 @@ interface CodexStats {
   error?: string;
 }
 
+// -------- Translation maps --------
+const SIGNAL_LABEL: Record<string, string> = {
+  "OpenClaw liveness": "龍蝦在線狀態",
+  "Sync bridge": "知識庫同步",
+  "Bus close hygiene": "任務收尾乾淨度",
+  "HF discipline": "交接卡紀律",
+  "M2 symmetry": "雙向學習平衡",
+  "Queue decay": "候選池新陳代謝",
+};
+
+const TASK_STATUS_LABEL: Record<string, string> = {
+  pending: "待處理",
+  ack: "已收到",
+  progress: "處理中",
+  "keep-alive": "還在跑",
+  done: "完成",
+  fail: "失敗",
+  timeout: "超時",
+};
+
+const HF_STATUS_LABEL: Record<string, string> = {
+  "pending-acceptance": "等對方回應",
+  "pending-decision": "等對方裁決",
+  accepted: "已接受",
+  "accepted-closed": "已接受並收尾",
+  "accepted-closed-by-seal": "已隨計劃封盤",
+  rejected: "已拒絕",
+  "clarification-requested": "等對方澄清",
+  "draft-for-receiver-review": "等對方 review",
+};
+
+const KIND_LABEL: Record<string, string> = {
+  evolution: "學習筆記",
+  "bus-learning": "任務心得",
+  memory: "記憶",
+  ratelimit: "限流事件",
+  "hf-card": "交接卡",
+  "bus-event": "任務事件",
+};
+
+const HOOK_LABEL: Record<string, string> = {
+  before_model: "AI 思考前",
+  after_model: "AI 回應後",
+  before_tool: "工具呼叫前",
+  after_tool: "工具回傳後",
+  on_session_end: "結束前清理",
+};
+
+const MIDDLEWARE_LABEL: Record<string, string> = {
+  tracing: "計時追蹤",
+  "thread-data": "工作區建立",
+  "dangling-tool-call": "補回斷掉的工具回應",
+  guardrail: "禁用工具守門",
+  summarization: "長對話壓縮",
+  "todo-list": "待辦清單追蹤",
+  "memory-extraction": "對話抽事實",
+  "loop-detection": "重複迴圈偵測",
+};
+
+const SYNC_CHECK_LABEL: Record<string, string> = {
+  H1: "Hermes 端 wiki 存在",
+  H2: "OpenClaw 端 wiki 存在",
+  H3: "兩邊內容一致",
+  H4: "排程同步有在跑",
+};
+
+const CATEGORY_LABEL: Record<string, string> = {
+  preference: "偏好",
+  goal: "目標",
+  fact: "事實",
+  context: "脈絡",
+  habit: "習慣",
+  identity: "身份",
+  blocker: "阻礙",
+  other: "其他",
+};
+
+const HF_DECISION_LABEL: Record<string, string> = {
+  accept: "接受",
+  reject: "拒絕",
+  "request-clarification": "請對方澄清",
+};
+
+function localizeStatus(status: string): string {
+  return TASK_STATUS_LABEL[status] || status;
+}
+
+function localizeHfStatus(status: string): string {
+  return HF_STATUS_LABEL[status] || status;
+}
+
+function localizeKind(kind: string): string {
+  return KIND_LABEL[kind] || kind;
+}
+
+function localizeMiddleware(name: string): string {
+  return MIDDLEWARE_LABEL[name] || name;
+}
+
+function localizeHook(hook: string): string {
+  return HOOK_LABEL[hook] || hook;
+}
+
+function localizeSyncCheck(id: string): string {
+  return SYNC_CHECK_LABEL[id] || id;
+}
+
+function localizeCategory(cat: string): string {
+  return CATEGORY_LABEL[cat] || cat;
+}
+
 // -------- Helpers --------
 function statusBadgeVariant(status: string): "success" | "warning" | "destructive" | "outline" {
   if (status === "done") return "success";
@@ -315,9 +426,11 @@ export default function AgentsPage() {
   }, [refreshNonce]);
 
   async function closeBusTask(taskId: string, outcome: "done" | "fail" | "keep-alive") {
+    const outcomeZh =
+      outcome === "done" ? "完成" : outcome === "fail" ? "失敗" : "延長時限";
     const summary = prompt(
-      `為 ${taskId} 下 ${outcome} — 請輸入一句 summary:`,
-      outcome === "keep-alive" ? "仍在進行中，延長 deadline" : ""
+      `為任務 ${taskId} 標記「${outcomeZh}」— 請輸入一句說明：`,
+      outcome === "keep-alive" ? "仍在進行中，延長截止時間" : ""
     );
     if (!summary || !summary.trim()) return;
     const res = await fetch(`/api/dual-agent/bus/${taskId}/close`, {
@@ -327,10 +440,10 @@ export default function AgentsPage() {
     });
     const j = await res.json();
     if (j.ok) {
-      flashToast(`✅ ${taskId} → ${outcome}`);
+      flashToast(`✅ ${taskId} → ${outcomeZh}`);
       refresh();
     } else {
-      flashToast(`❌ ${j.error || "close failed"}`);
+      flashToast(`❌ ${j.error || "收尾失敗"}`);
     }
   }
 
@@ -338,7 +451,8 @@ export default function AgentsPage() {
     cardFile: string,
     decision: "accept" | "reject" | "request-clarification"
   ) {
-    const note = prompt(`為 ${cardFile} 加一句 decision note（可空）：`, "") ?? "";
+    const decisionZh = HF_DECISION_LABEL[decision] || decision;
+    const note = prompt(`為交接卡 ${cardFile} 加一句說明（可空）：`, "") ?? "";
     const res = await fetch(
       `/api/dual-agent/hf/${encodeURIComponent(cardFile)}/decision`,
       {
@@ -349,10 +463,10 @@ export default function AgentsPage() {
     );
     const j = await res.json();
     if (j.ok) {
-      flashToast(`✅ ${cardFile} → ${j.new_status}`);
+      flashToast(`✅ ${cardFile} → ${localizeHfStatus(j.new_status) || decisionZh}`);
       refresh();
     } else {
-      flashToast(`❌ ${j.error || "decision failed"}`);
+      flashToast(`❌ ${j.error || "處理失敗"}`);
     }
   }
 
@@ -404,7 +518,7 @@ export default function AgentsPage() {
         <div>
           <h1 className="text-2xl font-semibold">雙 Agent 控制台</h1>
           <div className="mt-1 text-sm text-muted-foreground">
-            Hermes × OpenClaw 合夥人即時狀態 · 自動每 30 秒刷新 ·{" "}
+            Hermes（行政）× 龍蝦（技術）即時狀態 · 自動每 30 秒更新 ·{" "}
             <span className="font-mono">{d.ts}</span>
           </div>
         </div>
@@ -413,10 +527,10 @@ export default function AgentsPage() {
             <Send className="h-4 w-4" /> 派工給龍蝦
           </Button>
           <Button variant="outline" onClick={() => setShowCoaching(true)} className="gap-2">
-            <MessageSquare className="h-4 w-4" /> Coaching
+            <MessageSquare className="h-4 w-4" /> 教練回饋
           </Button>
           <Button variant="outline" onClick={refresh} className="gap-2">
-            <RefreshCw className="h-4 w-4" /> 刷新
+            <RefreshCw className="h-4 w-4" /> 重新整理
           </Button>
           <ScoreRing score={sc.score} max={sc.max} trend={sc.trend} trendIcon={trendIcon} />
         </div>
@@ -459,7 +573,7 @@ export default function AgentsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Activity className="h-4 w-4" /> Scorecard
+            <Activity className="h-4 w-4" /> 6 大訊號明細
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -476,34 +590,37 @@ export default function AgentsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Zap className="h-4 w-4" /> §9 Codex dispatch throttle
+              <Zap className="h-4 w-4" /> 雙 Agent 對話節流（避免過度頻繁打 AI）
               {throttle.enforcement_enabled ? (
-                <Badge variant="success">enforced</Badge>
+                <Badge variant="success">已啟用</Badge>
               ) : (
-                <Badge variant="warning">off</Badge>
+                <Badge variant="warning">關閉</Badge>
               )}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid gap-2 md:grid-cols-2">
-              {Object.entries(throttle.pairs).map(([pair, info]) => (
-                <div key={pair} className="rounded-md border border-border/60 bg-card/50 p-3 text-sm">
-                  <div className="flex items-center gap-2">
-                    {info.allowed ? (
-                      <Badge variant="success">ready</Badge>
-                    ) : (
-                      <Badge variant="destructive">blocked</Badge>
+              {Object.entries(throttle.pairs).map(([pair, info]) => {
+                const labelMap: Record<string, string> = {
+                  hermes_to_openclaw: "Hermes → 龍蝦",
+                  openclaw_to_hermes: "龍蝦 → Hermes",
+                };
+                return (
+                  <div key={pair} className="rounded-md border border-border/60 bg-card/50 p-3 text-sm">
+                    <div className="flex items-center gap-2">
+                      {info.allowed ? (
+                        <Badge variant="success">可派工</Badge>
+                      ) : (
+                        <Badge variant="destructive">需等待</Badge>
+                      )}
+                      <span className="font-medium">{labelMap[pair] || pair}</span>
+                    </div>
+                    {info.reason && (
+                      <div className="mt-1 text-xs text-muted-foreground">{info.reason}</div>
                     )}
-                    <span className="font-mono text-xs">{pair.replace("_to_", " → ")}</span>
                   </div>
-                  {info.reason && (
-                    <div className="mt-1 text-xs text-muted-foreground">{info.reason}</div>
-                  )}
-                  <div className="mt-1 text-xs text-muted-foreground font-mono">
-                    {JSON.stringify(info.stats)}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -514,7 +631,7 @@ export default function AgentsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <LineChart className="h-4 w-4" /> Score history（最近 {Math.min(snapshots.length, 20)} 份快照）
+              <LineChart className="h-4 w-4" /> 過去分數變化（最近 {Math.min(snapshots.length, 20)} 次紀錄）
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -528,14 +645,14 @@ export default function AgentsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Layers className="h-4 w-4" /> Middleware chain（S3）
+              <Layers className="h-4 w-4" /> 處理流水線（每次 AI 對話經過的 8 個關卡）
               {middleware.master_enabled ? (
-                <Badge variant="success">{middleware.master_mode}</Badge>
+                <Badge variant="success">啟用中</Badge>
               ) : (
-                <Badge variant="warning">off</Badge>
+                <Badge variant="warning">關閉</Badge>
               )}
               <span className="text-xs text-muted-foreground ml-2">
-                {middleware.entries.filter((e) => e.enabled).length}/{middleware.entries.length} enabled
+                {middleware.entries.filter((e) => e.enabled).length}/{middleware.entries.length} 啟用
               </span>
             </CardTitle>
           </CardHeader>
@@ -551,12 +668,12 @@ export default function AgentsPage() {
                     #{e.order}
                   </span>
                   {e.enabled ? (
-                    <Badge variant="success">on</Badge>
+                    <Badge variant="success">啟用</Badge>
                   ) : (
-                    <Badge variant="outline">off</Badge>
+                    <Badge variant="outline">關閉</Badge>
                   )}
-                  <span className="flex-1 font-mono text-xs">{e.name}</span>
-                  {e.critical && <Badge variant="destructive">critical</Badge>}
+                  <span className="flex-1 text-xs">{localizeMiddleware(e.name)}</span>
+                  {e.critical && <Badge variant="destructive">嚴重</Badge>}
                 </div>
               ))}
             </div>
@@ -574,11 +691,11 @@ export default function AgentsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Brain className="h-4 w-4" /> Auto-memory facts（S4）
+              <Brain className="h-4 w-4" /> 自動記下的事實（從你的對話抽出來）
               {autoMemory.exists ? (
-                <Badge variant="success">{autoMemory.count || 0} facts</Badge>
+                <Badge variant="success">{autoMemory.count || 0} 件</Badge>
               ) : (
-                <Badge variant="outline">尚未寫入</Badge>
+                <Badge variant="outline">尚未產生</Badge>
               )}
             </CardTitle>
           </CardHeader>
@@ -587,25 +704,27 @@ export default function AgentsPage() {
               <div className="text-sm text-destructive">{autoMemory.error}</div>
             ) : autoMemory.facts.length === 0 ? (
               <div className="text-sm text-muted-foreground">
-                還沒 auto-extracted facts — bus task close 時會觸發 MemoryExtractionMiddleware，
-                30s debounce 後從對話抽取 fact 寫入 <span className="font-mono">{autoMemory.path}</span>。
+                還沒抽出任何事實。每當有 bus 任務完成、AI 會在 30 秒後從對話內容自動萃取
+                關於你的事實（偏好、習慣、背景），存到 <span className="font-mono text-xs">{autoMemory.path}</span>。
               </div>
             ) : (
               <div className="space-y-1 max-h-72 overflow-y-auto">
-                {autoMemory.facts.map((f) => (
-                  <div
-                    key={f.id}
-                    className="flex items-start gap-2 rounded border border-border/60 bg-card/50 p-2 text-sm"
-                  >
-                    <Badge variant="outline" className="mt-0.5">{f.category}</Badge>
-                    <div className="min-w-0 flex-1">
-                      <div>{f.content}</div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">
-                        confidence {f.confidence.toFixed(2)} · source {f.source}
+                {autoMemory.facts.map((f) => {
+                  return (
+                    <div
+                      key={f.id}
+                      className="flex items-start gap-2 rounded border border-border/60 bg-card/50 p-2 text-sm"
+                    >
+                      <Badge variant="outline" className="mt-0.5">{localizeCategory(f.category)}</Badge>
+                      <div className="min-w-0 flex-1">
+                        <div>{f.content}</div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          可信度 {(f.confidence * 100).toFixed(0)}% · 來源 {f.source}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -617,69 +736,83 @@ export default function AgentsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Zap className="h-4 w-4" /> Codex CLI 調用統計（24h）
+              <Zap className="h-4 w-4" /> AI 模型呼叫統計（最近 24 小時）
               <Badge variant={(codexStats.fail || 0) === 0 ? "success" : "warning"}>
-                {codexStats.ok}/{codexStats.total} ok
+                {codexStats.ok}/{codexStats.total} 成功
               </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-6 text-sm">
               <div>
-                <div className="text-xs text-muted-foreground">Total</div>
+                <div className="text-xs text-muted-foreground">總呼叫</div>
                 <div className="text-2xl font-bold">{codexStats.total}</div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">Avg latency</div>
+                <div className="text-xs text-muted-foreground">平均耗時</div>
                 <div className="text-2xl font-bold">
                   {codexStats.avg_ms != null
-                    ? `${(codexStats.avg_ms / 1000).toFixed(1)}s`
+                    ? `${(codexStats.avg_ms / 1000).toFixed(1)}秒`
                     : "—"}
                 </div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">p95</div>
+                <div className="text-xs text-muted-foreground">95% 內</div>
                 <div className="text-2xl font-bold">
                   {codexStats.p95_ms != null
-                    ? `${(codexStats.p95_ms / 1000).toFixed(1)}s`
+                    ? `${(codexStats.p95_ms / 1000).toFixed(1)}秒`
                     : "—"}
                 </div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">Fail</div>
+                <div className="text-xs text-muted-foreground">失敗</div>
                 <div className="text-2xl font-bold">{codexStats.fail}</div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">Cost proxy</div>
+                <div className="text-xs text-muted-foreground">費用</div>
                 <div className="text-2xl font-bold text-green-500">$0</div>
-                <div className="text-xs text-muted-foreground">(codex subscription)</div>
+                <div className="text-xs text-muted-foreground">（用你訂閱的 codex）</div>
               </div>
             </div>
             <div className="mt-3 grid gap-2 md:grid-cols-2">
               <div>
-                <div className="text-xs text-muted-foreground mb-1">By attempt</div>
+                <div className="text-xs text-muted-foreground mb-1">用途分類</div>
                 <div className="space-y-1 text-xs">
-                  {Object.entries(codexStats.by_attempt || {}).map(([k, v]) => (
-                    <div key={k} className="flex justify-between font-mono">
-                      <span>{k}</span>
-                      <span>{v}</span>
-                    </div>
-                  ))}
+                  {Object.entries(codexStats.by_attempt || {}).map(([k, v]) => {
+                    const labelMap: Record<string, string> = {
+                      "memory-extract": "抽事實",
+                      "dashboard-smoke-test": "面板測試",
+                      "subagent:general-purpose": "子代理（通用）",
+                      "subagent:bash": "子代理（指令）",
+                    };
+                    return (
+                      <div key={k} className="flex justify-between">
+                        <span>{labelMap[k] || k}</span>
+                        <span className="font-mono">{v}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
               {Object.keys(codexStats.by_error || {}).length > 0 && (
                 <div>
-                  <div className="text-xs text-muted-foreground mb-1">Errors</div>
+                  <div className="text-xs text-muted-foreground mb-1">錯誤類型</div>
                   <div className="space-y-1 text-xs">
-                    {Object.entries(codexStats.by_error || {}).map(([k, v]) => (
-                      <div
-                        key={k}
-                        className="flex justify-between font-mono text-destructive/80"
-                      >
-                        <span>{k}</span>
-                        <span>{v}</span>
-                      </div>
-                    ))}
+                    {Object.entries(codexStats.by_error || {}).map(([k, v]) => {
+                      const errMap: Record<string, string> = {
+                        throttled: "被節流擋下",
+                        timeout: "逾時",
+                        not_found: "找不到 codex",
+                        non_zero: "非零退出碼",
+                        disabled: "已停用",
+                      };
+                      return (
+                        <div key={k} className="flex justify-between text-destructive/80">
+                          <span>{errMap[k] || k}</span>
+                          <span className="font-mono">{v}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -693,9 +826,9 @@ export default function AgentsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Timer className="h-4 w-4" /> Trace spans（S10，本地 JSONL）
+              <Timer className="h-4 w-4" /> 動作耗時追蹤（每次 AI 處理過了哪幾關、各花多久）
               <span className="text-xs text-muted-foreground ml-2">
-                最近 {traces.spans.length}  /  total {traces.total_lines}
+                最近 {traces.spans.length} 筆 / 累計 {traces.total_lines}
               </span>
             </CardTitle>
           </CardHeader>
@@ -710,9 +843,9 @@ export default function AgentsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <FolderTree className="h-4 w-4" /> Per-thread sandboxes（S7）
+              <FolderTree className="h-4 w-4" /> 各任務工作區（每個任務有自己的暫存資料夾）
               <span className="text-xs text-muted-foreground ml-2">
-                {sandboxes.threads.length} active ·{" "}
+                目前 {sandboxes.threads.length} 個 ·{" "}
                 <span className="font-mono">{sandboxes.root}</span>
               </span>
             </CardTitle>
@@ -728,9 +861,9 @@ export default function AgentsPage() {
                     {t.thread_id}
                   </div>
                   <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
-                    <span>ws: {t.workspace_count}</span>
-                    <span>up: {t.uploads_count}</span>
-                    <span>out: {t.outputs_count}</span>
+                    <span>工作區: {t.workspace_count}</span>
+                    <span>上傳: {t.uploads_count}</span>
+                    <span>輸出: {t.outputs_count}</span>
                   </div>
                 </div>
               ))}
@@ -758,7 +891,7 @@ export default function AgentsPage() {
             <div className="space-y-1.5 max-h-96 overflow-y-auto">
               {activity.map((e, i) => (
                 <div key={i} className="flex items-start gap-2 text-sm">
-                  <Badge variant="outline" className="mt-0.5 shrink-0">{e.kind}</Badge>
+                  <Badge variant="outline" className="mt-0.5 shrink-0">{localizeKind(e.kind)}</Badge>
                   <div className="min-w-0 flex-1">
                     <div className="truncate">{e.title}</div>
                     {e.subtitle && (
@@ -786,23 +919,23 @@ export default function AgentsPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="text-sm">
-              <div className="text-muted-foreground">Last daily review</div>
+              <div className="text-muted-foreground">最近一次每日盤點</div>
               <div className="font-mono">
                 {d.daily_review?.hermes_last_reviewed || "—"}
                 {d.daily_review?.today_done && <Badge variant="success" className="ml-2">今天已跑</Badge>}
               </div>
             </div>
             <div className="text-sm">
-              <div className="text-muted-foreground">Outbound evolution notes</div>
+              <div className="text-muted-foreground">寫給龍蝦的學習筆記</div>
               <div>
-                總計 <span className="font-mono">{d.evolution.total_outbound_hermes_to_openclaw}</span>
-                {" · "}本週 <span className="font-mono">{d.evolution.this_week_outbound}</span>
+                總計 <span className="font-mono">{d.evolution.total_outbound_hermes_to_openclaw}</span> 篇
+                {" · "}本週 <span className="font-mono">{d.evolution.this_week_outbound}</span> 篇
               </div>
             </div>
             <div className="text-sm">
-              <div className="text-muted-foreground">Coaching session</div>
+              <div className="text-muted-foreground">教練回饋（替龍蝦想答案）</div>
               <div>
-                Empty-chair 預測 <span className="font-mono">{d.coaching.empty_chair_filled}</span> 段
+                已預測 <span className="font-mono">{d.coaching.empty_chair_filled}</span> 段對話
               </div>
             </div>
           </CardContent>
@@ -817,37 +950,37 @@ export default function AgentsPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="text-sm">
-              <div className="text-muted-foreground">Gateway</div>
+              <div className="text-muted-foreground">守門員（Gateway）狀態</div>
               <div>
                 {d.openclaw.gateway_state === "running" ? (
-                  <Badge variant="success">Running</Badge>
+                  <Badge variant="success">運行中</Badge>
                 ) : (
-                  <Badge variant="destructive">{d.openclaw.gateway_state || "unknown"}</Badge>
+                  <Badge variant="destructive">{d.openclaw.gateway_state === "down" ? "已停止" : (d.openclaw.gateway_state || "未知")}</Badge>
                 )}
                 {" "}
                 {d.openclaw.codex_app_server_running ? (
-                  <Badge variant="success" className="ml-1">Codex ready</Badge>
+                  <Badge variant="success" className="ml-1">Codex 就緒</Badge>
                 ) : (
-                  <Badge variant="warning" className="ml-1">Codex off</Badge>
+                  <Badge variant="warning" className="ml-1">Codex 未啟動</Badge>
                 )}
               </div>
             </div>
             <div className="text-sm">
-              <div className="text-muted-foreground">Inbound evolution notes</div>
+              <div className="text-muted-foreground">龍蝦寫回給 Hermes 的筆記</div>
               <div>
-                總計 <span className="font-mono">{d.evolution.total_inbound_openclaw_to_hermes}</span>
-                {" · "}本週 <span className="font-mono">{d.evolution.this_week_inbound}</span>
+                總計 <span className="font-mono">{d.evolution.total_inbound_openclaw_to_hermes}</span> 篇
+                {" · "}本週 <span className="font-mono">{d.evolution.this_week_inbound}</span> 篇
                 {!d.evolution.m2_symmetry_ok && (
-                  <Badge variant="destructive" className="ml-2">M2 asymmetry</Badge>
+                  <Badge variant="destructive" className="ml-2">雙向學習失衡</Badge>
                 )}
               </div>
             </div>
             <div className="text-sm">
-              <div className="text-muted-foreground">Coaching session</div>
+              <div className="text-muted-foreground">教練回饋待回填</div>
               <div>
                 {d.coaching.blanks_openclaw}{" "}
                 {d.coaching.blanks_openclaw && d.coaching.blanks_openclaw > 0 ? (
-                  <Badge variant="warning">待回填</Badge>
+                  <Badge variant="warning">待龍蝦回填</Badge>
                 ) : (
                   <Badge variant="success">已完成</Badge>
                 )}
@@ -868,14 +1001,14 @@ export default function AgentsPage() {
           <BusPipeline tasks={bus} />
           {busOpen.length > 0 && (
             <div>
-              <div className="mb-2 text-sm font-medium">進行中 ({busOpen.length})</div>
+              <div className="mb-2 text-sm font-medium">進行中的任務 ({busOpen.length})</div>
               <div className="space-y-2">
                 {busOpen.map((t) => (
                   <div
                     key={t.task_id}
                     className="flex items-start gap-3 rounded-md border border-border/60 bg-card/50 p-3"
                   >
-                    <Badge variant={statusBadgeVariant(t.status)}>{t.status}</Badge>
+                    <Badge variant={statusBadgeVariant(t.status)}>{localizeStatus(t.status)}</Badge>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm">
                         <span className="font-mono text-xs text-muted-foreground">
@@ -885,7 +1018,7 @@ export default function AgentsPage() {
                         <span>{t.from_agent} → {t.to_agent}</span>
                         {" · "}
                         <span className="text-xs text-muted-foreground">
-                          {timeAgoShort(t.created_at)} ago
+                          {timeAgoShort(t.created_at)} 前派出
                         </span>
                       </div>
                       <div className="mt-1 text-sm text-foreground/80">{t.goal}</div>
@@ -895,21 +1028,21 @@ export default function AgentsPage() {
                           variant="outline"
                           onClick={() => closeBusTask(t.task_id, "done")}
                         >
-                          done
+                          標記完成
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => closeBusTask(t.task_id, "fail")}
                         >
-                          fail
+                          標記失敗
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => closeBusTask(t.task_id, "keep-alive")}
                         >
-                          keep-alive
+                          延長時限
                         </Button>
                       </div>
                     </div>
@@ -921,16 +1054,16 @@ export default function AgentsPage() {
           {busOpen.length === 0 && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <CheckCircle2 className="h-4 w-4 text-green-500" />
-              無 open task · finalizer gate 保持乾淨
+              目前沒有未結案任務（收尾守門員顯示乾淨）
             </div>
           )}
 
           <div>
-            <div className="mb-2 text-sm font-medium">最近結案 ({busRecent.length})</div>
+            <div className="mb-2 text-sm font-medium">最近結案的任務 ({busRecent.length})</div>
             <div className="space-y-1">
               {busRecent.map((t) => (
                 <div key={t.task_id} className="flex items-center gap-3 text-sm">
-                  <Badge variant={statusBadgeVariant(t.status)}>{t.status}</Badge>
+                  <Badge variant={statusBadgeVariant(t.status)}>{localizeStatus(t.status)}</Badge>
                   <span className="font-mono text-xs text-muted-foreground">{t.task_id}</span>
                   <span className="truncate text-foreground/70">{t.goal}</span>
                 </div>
@@ -939,9 +1072,9 @@ export default function AgentsPage() {
           </div>
 
           <div className="grid gap-2 border-t border-border/50 pt-3 text-xs text-muted-foreground md:grid-cols-3">
-            <div>7d events: <span className="font-mono">{JSON.stringify(d.bus.events_7d)}</span></div>
-            <div>keep-alive 7d: <span className="font-mono">{d.bus.keep_alive_7d ?? 0}</span></div>
-            <div>amend_learning 7d: <span className="font-mono">{d.bus.amend_learning_7d ?? 0}</span></div>
+            <div>近 7 天事件分布: <span className="font-mono">{JSON.stringify(d.bus.events_7d)}</span></div>
+            <div>近 7 天延長時限次數: <span className="font-mono">{d.bus.keep_alive_7d ?? 0}</span></div>
+            <div>近 7 天補學習筆記次數: <span className="font-mono">{d.bus.amend_learning_7d ?? 0}</span></div>
           </div>
         </CardContent>
       </Card>
@@ -950,24 +1083,24 @@ export default function AgentsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <GitBranch className="h-4 w-4" /> Handoff cards（se-012）
+            <GitBranch className="h-4 w-4" /> 交接卡（雙方互相派工的紀錄）
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {hfPending.length > 0 && (
             <div>
-              <div className="mb-2 text-sm font-medium">Pending ({hfPending.length})</div>
+              <div className="mb-2 text-sm font-medium">等回應中 ({hfPending.length} 張)</div>
               <div className="space-y-2">
                 {hfPending.map((c) => (
                   <div
                     key={c.file}
                     className="flex items-start gap-3 rounded-md border border-border/60 bg-card/50 p-3"
                   >
-                    <Badge variant={hfStatusBadge(c.status)}>{c.status}</Badge>
+                    <Badge variant={hfStatusBadge(c.status)}>{localizeHfStatus(c.status)}</Badge>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">{c.title}</div>
                       <div className="mt-0.5 text-xs text-muted-foreground">
-                        {c.from_agent} → {c.to_agent} · freshness {c.freshness_ts || "—"}
+                        {c.from_agent} → {c.to_agent} · 更新時間 {c.freshness_ts || "—"}
                       </div>
                       <div className="mt-0.5 text-xs text-muted-foreground font-mono">{c.file}</div>
                       <div className="mt-2 flex gap-2">
@@ -976,21 +1109,21 @@ export default function AgentsPage() {
                           variant="outline"
                           onClick={() => hfDecision(c.file, "accept")}
                         >
-                          accept
+                          接受
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => hfDecision(c.file, "reject")}
                         >
-                          reject
+                          拒絕
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => hfDecision(c.file, "request-clarification")}
                         >
-                          request-clarification
+                          請對方澄清
                         </Button>
                       </div>
                     </div>
@@ -1002,12 +1135,12 @@ export default function AgentsPage() {
 
           <div>
             <div className="mb-2 text-sm font-medium">
-              已關閉 ({hfAccepted.length})
+              已收尾 ({hfAccepted.length} 張)
             </div>
             <div className="space-y-1 text-xs text-muted-foreground">
               {hfAccepted.slice(0, 5).map((c) => (
                 <div key={c.file} className="flex items-center gap-2">
-                  <Badge variant="outline">{c.status}</Badge>
+                  <Badge variant="outline">{localizeHfStatus(c.status)}</Badge>
                   <span className="truncate">{c.title}</span>
                 </div>
               ))}
@@ -1042,7 +1175,7 @@ export default function AgentsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Clock className="h-4 w-4" /> Sync bridge（se-007）
+            <Clock className="h-4 w-4" /> 知識庫同步檢查（讓兩邊看到同樣的 wiki）
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-1 text-sm">
@@ -1053,7 +1186,7 @@ export default function AgentsPage() {
               ) : (
                 <AlertCircle className="h-4 w-4 text-destructive" />
               )}
-              <span className="font-mono text-xs">{c.id}</span>
+              <span className="font-mono text-xs">{localizeSyncCheck(c.id)}</span>
               <span className="text-xs text-muted-foreground">{c.detail}</span>
             </div>
           ))}
@@ -1153,17 +1286,18 @@ function SignalStrip({ breakdown }: { breakdown: Record<string, [string, string]
       {Object.entries(breakdown).map(([name, tuple]) => {
         const [emoji, reason] = tuple;
         const color = COLORS[emoji] || "#737373";
+        const label = SIGNAL_LABEL[name] || name;
         return (
           <div
             key={name}
             className="rounded-md border border-border/60 bg-card/50 p-2"
-            title={`${name}\n${reason}`}
+            title={`${label}\n${reason}`}
           >
             <div
               className="h-1 rounded-full mb-1.5"
               style={{ backgroundColor: color }}
             />
-            <div className="text-[0.7rem] font-medium truncate">{name}</div>
+            <div className="text-[0.7rem] font-medium truncate">{label}</div>
             <div className="text-[0.65rem] text-muted-foreground truncate">
               {reason}
             </div>
@@ -1192,13 +1326,14 @@ function ScoreTile({
       : emoji === "🔴"
       ? "border-red-500/40 bg-red-500/5"
       : "border-border/60 bg-card/50";
+  const label = SIGNAL_LABEL[name] || name;
   return (
     <div
       className={`flex items-start gap-3 rounded-md border p-3 transition-colors ${tone}`}
     >
       <div className="text-2xl">{emoji}</div>
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium">{name}</div>
+        <div className="text-sm font-medium">{label}</div>
         <div className="mt-0.5 text-xs text-muted-foreground">{reason}</div>
       </div>
     </div>
@@ -1208,7 +1343,6 @@ function ScoreTile({
 // -------- MiddlewareFlow (horizontal pipeline diagram) --------
 function MiddlewareFlow({ entries }: { entries: MiddlewareEntry[] }) {
   if (entries.length === 0) return null;
-  // Sort by order, color by enabled state
   const sorted = [...entries].sort((a, b) => a.order - b.order);
   return (
     <div className="overflow-x-auto -mx-2 px-2 pb-1">
@@ -1219,18 +1353,19 @@ function MiddlewareFlow({ entries }: { entries: MiddlewareEntry[] }) {
               ? "bg-red-500/20 border-red-500/60 text-red-500"
               : "bg-green-500/15 border-green-500/50 text-green-600"
             : "bg-muted/40 border-border/60 text-muted-foreground line-through";
+          const label = localizeMiddleware(e.name);
           return (
             <div key={e.name} className="flex items-center">
               <div
                 className={`relative rounded-md border ${fill} px-2.5 py-1.5 text-xs whitespace-nowrap`}
-                title={`order ${e.order} · env ${e.env_var || "(none)"} · ${
-                  e.enabled ? "enabled" : "disabled"
+                title={`順序 ${e.order} · 開關 ${e.env_var || "(無)"} · ${
+                  e.enabled ? "啟用中" : "關閉"
                 }`}
               >
                 <span className="absolute -top-1.5 left-1.5 px-1 text-[0.6rem] bg-background border border-border/60 rounded font-mono">
                   {e.order}
                 </span>
-                <span className="font-mono">{e.name}</span>
+                <span>{label}</span>
               </div>
               {i < sorted.length - 1 && (
                 <span className="text-muted-foreground/40 px-1">→</span>
@@ -1328,7 +1463,7 @@ function TraceTimeline({ spans }: { spans: TraceSpan[] }) {
       {/* Distribution bar — what % of time each hook took */}
       <div>
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-          <span>Hook time distribution ({totalCalls} calls, {totalTime.toFixed(1)}ms total)</span>
+          <span>各階段佔用時間分布（{totalCalls} 次呼叫，總計 {totalTime.toFixed(1)} 毫秒）</span>
         </div>
         <div className="flex h-6 rounded overflow-hidden border border-border/40">
           {Object.entries(byHook).map(([hook, stats]) => {
@@ -1340,9 +1475,9 @@ function TraceTimeline({ spans }: { spans: TraceSpan[] }) {
                 key={hook}
                 style={{ width: `${pct}%`, backgroundColor: color }}
                 className="flex items-center justify-center text-[0.65rem] text-white font-mono"
-                title={`${hook}: ${stats.total_ms.toFixed(2)}ms (${pct.toFixed(1)}%)`}
+                title={`${localizeHook(hook)}: ${stats.total_ms.toFixed(2)}ms (${pct.toFixed(1)}%)`}
               >
-                {pct > 5 ? hook.replace("_", " ") : ""}
+                {pct > 5 ? localizeHook(hook) : ""}
               </div>
             );
           })}
@@ -1354,9 +1489,9 @@ function TraceTimeline({ spans }: { spans: TraceSpan[] }) {
                 className="inline-block w-2 h-2 rounded-sm"
                 style={{ backgroundColor: HOOK_COLORS[hook] || "#737373" }}
               />
-              <span className="font-mono">{hook}</span>
+              <span>{localizeHook(hook)}</span>
               <span className="text-muted-foreground">
-                {stats.count}× avg {(stats.total_ms / stats.count).toFixed(1)}ms
+                {stats.count} 次 · 平均 {(stats.total_ms / stats.count).toFixed(1)} 毫秒
               </span>
             </div>
           ))}
@@ -1365,14 +1500,14 @@ function TraceTimeline({ spans }: { spans: TraceSpan[] }) {
 
       {/* Recent 20 spans as colored bars */}
       <div className="space-y-1">
-        <div className="text-xs text-muted-foreground mb-1">最近 20 條 spans</div>
+        <div className="text-xs text-muted-foreground mb-1">最近 20 次動作</div>
         {spans.slice(-20).reverse().map((s, i) => {
           const pct = Math.min(100, (s.duration_ms / overallMax) * 100);
           const color = HOOK_COLORS[s.hook] || "#737373";
           return (
             <div key={i} className="flex items-center gap-2 text-xs">
-              <span className="w-28 shrink-0 font-mono text-muted-foreground truncate">
-                {s.hook}
+              <span className="w-28 shrink-0 text-muted-foreground truncate">
+                {localizeHook(s.hook)}
               </span>
               <div className="flex-1 relative h-5 rounded bg-background/50 border border-border/40">
                 <div
@@ -1560,7 +1695,7 @@ function CoachingModal({
         onCommented();
         setComment("");
       } else {
-        setErr(j.error || "post failed");
+        setErr(j.error || "送出失敗");
       }
     } catch (e) {
       setErr(String(e));
@@ -1574,10 +1709,10 @@ function CoachingModal({
       <div className="w-full max-w-3xl max-h-[90vh] flex flex-col rounded-lg border border-border bg-card shadow-xl">
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <h2 className="text-lg font-semibold">
-            Coaching session
+            教練回饋（針對龍蝦）
             {data && data.blanks > 0 && (
               <Badge variant="warning" className="ml-2">
-                {data.blanks} blanks
+                {data.blanks} 段待回填
               </Badge>
             )}
           </h2>
@@ -1595,7 +1730,7 @@ function CoachingModal({
           {data ? (
             <>
               <div className="mb-4">
-                <div className="mb-1 text-xs text-muted-foreground">Prompts ({data.prompts.length})</div>
+                <div className="mb-1 text-xs text-muted-foreground">提問點 ({data.prompts.length} 個)</div>
                 <div className="flex flex-wrap gap-1">
                   {data.prompts.map((p, i) => (
                     <Badge
@@ -1614,31 +1749,31 @@ function CoachingModal({
               </div>
               <pre className="whitespace-pre-wrap text-xs font-mono leading-relaxed bg-background/50 p-3 rounded border border-border/60 max-h-96 overflow-y-auto">
                 {data.markdown.slice(0, 8000)}
-                {data.markdown.length > 8000 && "\n\n...（truncated，完整內容於 wiki 檔案）"}
+                {data.markdown.length > 8000 && "\n\n...（內容過長，完整版存在 wiki 檔案）"}
               </pre>
             </>
           ) : (
-            <div className="text-sm text-muted-foreground">Loading…</div>
+            <div className="text-sm text-muted-foreground">載入中…</div>
           )}
         </div>
 
         <div className="border-t border-border px-5 py-3 space-y-2">
-          <div className="text-sm font-medium">Quick comment</div>
+          <div className="text-sm font-medium">快速留言</div>
           <div className="grid grid-cols-2 gap-2">
             <select
               value={actor}
               onChange={(e) => setActor(e.target.value)}
               className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
             >
-              <option value="brian">brian</option>
-              <option value="hermes">hermes</option>
-              <option value="openclaw">openclaw</option>
+              <option value="brian">Brian（你）</option>
+              <option value="hermes">Hermes</option>
+              <option value="openclaw">龍蝦</option>
             </select>
             <input
               type="text"
               value={section}
               onChange={(e) => setSection(e.target.value)}
-              placeholder="section (e.g. Q2.1)"
+              placeholder="哪個段落（例 Q2.1）"
               className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
             />
           </div>
@@ -1654,7 +1789,7 @@ function CoachingModal({
               關閉
             </Button>
             <Button onClick={submit} disabled={submitting || !comment.trim()}>
-              {submitting ? "送出中…" : "附註到 session"}
+              {submitting ? "送出中…" : "加進這個 session"}
             </Button>
           </div>
         </div>
@@ -1681,7 +1816,7 @@ function DispatchModal({
 
   async function submit(force: boolean = false) {
     if (!goal.trim()) {
-      setErr("goal 不能空");
+      setErr("「要做什麼」不能空");
       return;
     }
     setSubmitting(true);
@@ -1709,11 +1844,11 @@ function DispatchModal({
         onDispatched(j.task_id);
       } else {
         // Better error formatting — if throttled or guardrail-denied, be explicit
-        let msg = j.error || "dispatch failed";
+        let msg = j.error || "派工失敗";
         if (j.throttled) {
-          msg = `⏱️ §9 throttle: ${j.error}`;
+          msg = `⏱️ 被節流擋下：${j.error}`;
         } else if (typeof j.error === "string" && j.error.includes("GUARDRAIL_DENY")) {
-          msg = `🛡️ Guardrail 拒絕：${j.error.replace("GUARDRAIL_DENY: ", "")}`;
+          msg = `🛡️ 守門員拒絕：${j.error.replace("GUARDRAIL_DENY: ", "")}`;
         }
         setErr(msg);
       }
@@ -1735,17 +1870,17 @@ function DispatchModal({
         </div>
         <div className="space-y-4 p-5">
           <div>
-            <label className="block text-sm font-medium mb-1">Goal *</label>
+            <label className="block text-sm font-medium mb-1">要做什麼 *</label>
             <textarea
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
-              placeholder="一句話講要做什麼。例：寫本週 inbound *_evolution_*.md，主題 openclaw-outbound-hook"
+              placeholder="一句話講要做什麼。例：寫本週寫給 Hermes 的學習筆記，主題：龍蝦回信機制"
               rows={2}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Context（可選）</label>
+            <label className="block text-sm font-medium mb-1">背景資訊（可選）</label>
             <textarea
               value={context}
               onChange={(e) => setContext(e.target.value)}
@@ -1755,18 +1890,18 @@ function DispatchModal({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Success criteria（可選）</label>
+            <label className="block text-sm font-medium mb-1">完成條件（可選）</label>
             <textarea
               value={criteria}
               onChange={(e) => setCriteria(e.target.value)}
-              placeholder="完成條件，怎麼算做完"
+              placeholder="怎麼算做完？例：檔案存在、test 通過、push 完成"
               rows={2}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Priority</label>
+              <label className="block text-sm font-medium mb-1">急迫程度</label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
@@ -1779,7 +1914,7 @@ function DispatchModal({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Deadline（分鐘，選填）</label>
+              <label className="block text-sm font-medium mb-1">截止時間（分鐘，選填）</label>
               <input
                 type="number"
                 value={deadline}
@@ -1804,9 +1939,9 @@ function DispatchModal({
               variant="outline"
               onClick={() => submit(true)}
               disabled={submitting}
-              title="繞過 §9 節流或 guardrail，事後會記錄 bypass log"
+              title="繞過節流或守門員拒絕，事後會記錄一筆 bypass log"
             >
-              繞過（force）
+              強制送出
             </Button>
           )}
           <Button onClick={() => submit(false)} disabled={submitting}>
